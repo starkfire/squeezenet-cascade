@@ -54,24 +54,33 @@ class HaarCascadeClassifier:
         confidence_scores = []
 
         for (x, y, w, h) in outputs:
-            roi = frame[y:y+h, x:x+w]
+            # roi = frame[y:y+h, x:x+w]
             confidence = len(outputs) / (w * h)
 
-            bbox_color = self.cockatiel_bbox_color if label.lower() == "cockatiel" else self.bird_bbox_color
-            threshold = self.cockatiel_threshold if label.lower() == "cockatiel" else self.bird_threshold
+            # bbox_color = self.cockatiel_bbox_color if label.lower() == "cockatiel" else self.bird_bbox_color
+            # threshold = self.cockatiel_threshold if label.lower() == "cockatiel" else self.bird_threshold
 
-            print(confidence)
-            print(label)
-            
             # if confidence >= threshold:
-            cv2.rectangle(roi, (x, y), (x+w, y+h), (0, 255, 0), 2)
-            cv2.putText(roi, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.68, bbox_color, 2)
-
+            # cv2.rectangle(roi, (x, y), (x+w, y+h), (0, 255, 0), 2)
+            # cv2.putText(roi, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.68, bbox_color, 2)
             confidence_scores.append(confidence)
 
         return {
             "scores": confidence_scores
         }
+
+
+    def mean(self, numbers):
+        return sum(numbers) / len(numbers)
+
+
+    def parse_result(self, bird_scores, cockatiel_scores): 
+        if len(bird_scores) > len(cockatiel_scores):
+            return "bird"
+        elif len(cockatiel_scores) > len(bird_scores):
+            return "cockatiel"
+        else:
+            return "cockatiel" if self.mean(cockatiel_scores) < self.mean(bird_scores) else "bird"
 
 
     def classify(self, image, display=True):
@@ -81,8 +90,8 @@ class HaarCascadeClassifier:
         birds = self.detect(self.bird_clf, gray)
         cockatiels = self.detect(self.cockatiel_clf, gray)
 
-        print(birds)
-        print(cockatiels)
+        # print(birds)
+        # print(cockatiels)
 
         bird_det = self.get_detections("Bird", gray, birds)
         cockatiel_det = self.get_detections("Cockatiel", gray, cockatiels)
@@ -90,11 +99,14 @@ class HaarCascadeClassifier:
         if display:
             self.display_cv_image(frame)
 
-        return {
+        results = {
             "frame": frame,
             "bird_scores": bird_det["scores"],
-            "cockatiel_scores": cockatiel_det["scores"]
+            "cockatiel_scores": cockatiel_det["scores"],
+            "result": self.parse_result(bird_det["scores"], cockatiel_det["scores"])
         }
+
+        return results
 
 
     def display_cv_image(self, image_mat):
