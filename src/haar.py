@@ -34,16 +34,26 @@ class HaarCascadeClassifier:
 
     
     def import_model(self, model_path):
+        """
+        Method for importing a Cascade Classifier model from XML
+        """
         dirname = os.path.dirname(__file__)
         filepath = os.path.join(dirname, model_path)
         return cv2.CascadeClassifier(filepath)
 
     
     def get_roi(self, image, x, y, w, h):
+        """
+        Helper method for returning the Region of Interest (ROI)
+        """
         return image[y:y+h, x:x+w]
 
 
     def detect(self, classifier, frame):
+        """
+        Method which simply performs a call to cv2.CascadeClassifier.detectMultiScale().
+        In short, it performs the detection process using Haar Cascade.
+        """
         return classifier.detectMultiScale(frame,
                                            scaleFactor=self.scaleFactor,
                                            minNeighbors=self.minNeighbors,
@@ -51,6 +61,9 @@ class HaarCascadeClassifier:
 
 
     def get_detections(self, label, frame, outputs):
+        """
+        Calculates the confidence/scores for each detected instance.
+        """
         confidence_scores = []
 
         for (x, y, w, h) in outputs:
@@ -71,10 +84,16 @@ class HaarCascadeClassifier:
 
 
     def mean(self, numbers):
+        """
+        Helper method for calculating Mean.
+        """
         return sum(numbers) / len(numbers)
 
 
     def parse_result(self, bird_scores, cockatiel_scores): 
+        """
+        Determines the final detected object based on input scores.
+        """
         if len(bird_scores) > len(cockatiel_scores):
             return "bird"
         elif len(cockatiel_scores) > len(bird_scores):
@@ -84,6 +103,9 @@ class HaarCascadeClassifier:
 
 
     def classify(self, image, display=True):
+        """
+        Runs the entire object detection/classification process.
+        """
         frame = cv2.imread(image)
         roi_frame = frame[self.roi_y:self.roi_y+self.roi_h, self.roi_x:self.roi_x+self.roi_w]
         gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
