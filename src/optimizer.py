@@ -14,6 +14,9 @@ class HaarOptimizer:
 
 
     def get_dataset_absolute_path(self, dataset_path):
+        """
+        Returns the absolute path to the target dataset path.
+        """
         current_dir = os.getcwd()
         return os.path.join(current_dir, dataset_path)
 
