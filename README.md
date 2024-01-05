@@ -36,6 +36,16 @@ You can also tell `main.py` to run explicitly in live mode:
 python main.py live
 ```
 
+Live mode relies on `cv2.VideoCapture()` and the index of the camera that will be used by default is `0`.
+
+If you are using an external USB camera, then you might need to specify a different index for `cv2.VideoCapture()` to identify the camera.
+
+Fortunately, `main.py` is already designed to accept a different index for the camera. Simply pass a `-c` option and the index. For example:
+
+```sh
+python main.py live -c 1
+```
+
 ### Image Inputs
 
 To detect bird/cockatiel instances from an image:
