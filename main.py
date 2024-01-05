@@ -6,7 +6,7 @@ from src.optimizer import HaarOptimizer
 def run_task(args):
     if args.task == "live":
         clf = HaarCascadeClassifier()
-        clf.classify_live()
+        clf.classify_live(camera_index=args.camera)
         return None
 
     if args.task == "detect":
@@ -25,6 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("task", nargs='?', type=str, default="live")
     parser.add_argument("--image", '-i', help="Path to an input image")
     parser.add_argument("--dataset", '-d', help="Path to a dataset directory")
+    parser.add_argument("--camera", '-c', nargs='?', type=int, default=0, help="Index of the camera that will be used by cv2.VideoCapture()")
 
     args = parser.parse_args()
 
