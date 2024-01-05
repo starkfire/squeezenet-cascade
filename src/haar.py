@@ -60,27 +60,41 @@ class HaarCascadeClassifier:
                                            minSize=self.minSize)
 
 
-    def get_detections(self, label, frame, outputs):
+    def get_detections(self, label, outputs):
         """
         Calculates the confidence/scores for each detected instance.
         """
         confidence_scores = []
+        bbox_regions = []
+        labels = []
 
         for (x, y, w, h) in outputs:
-            # roi = frame[y:y+h, x:x+w]
             confidence = len(outputs) / (w * h)
-
-            # bbox_color = self.cockatiel_bbox_color if label.lower() == "cockatiel" else self.bird_bbox_color
             # threshold = self.cockatiel_threshold if label.lower() == "cockatiel" else self.bird_threshold
-
-            # if confidence >= threshold:
-            # cv2.rectangle(roi, (x, y), (x+w, y+h), (0, 255, 0), 2)
-            # cv2.putText(roi, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.68, bbox_color, 2)
+            
             confidence_scores.append(confidence)
+            bbox_regions.append((x, y, w, h))
+            labels.append(label.lower())
 
         return {
-            "scores": confidence_scores
+            "scores": confidence_scores,
+            "bboxes": bbox_regions,
+            "labels": labels
         }
+
+
+    def attach_bounding_boxes(self, frame, bboxes, label):
+        """
+        Method for attaching bounding boxes based on provided lists
+        of bounding box coordinates and labels.
+        """
+        for (x, y, w, h) in bboxes:
+            bbox_color = self.cockatiel_bbox_color if label.lower() == "cockatiel" else self.bird_bbox_color
+            
+            cv2.rectangle(frame, (x, y), (x+w, y+h), bbox_color, 2)
+            cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.68, bbox_color, 2)
+
+        return frame
 
 
     def mean(self, numbers):
@@ -90,16 +104,34 @@ class HaarCascadeClassifier:
         return sum(numbers) / len(numbers)
 
 
-    def parse_result(self, bird_scores, cockatiel_scores): 
+    def parse_result(self, bird_det, cockatiel_det): 
         """
         Determines the final detected object based on input scores.
         """
+        bird_scores = bird_det["scores"]
+        cockatiel_scores = cockatiel_det["scores"]
+
+        result = {
+            "score": 0,
+            "label": "",
+            "bboxes": []
+        }
+
+        def update_result(label, bboxes):
+            result["label"] = label
+            result["bboxes"] = bboxes
+
         if len(bird_scores) > len(cockatiel_scores):
-            return "bird"
+            update_result("bird", bird_det["bboxes"])
         elif len(cockatiel_scores) > len(bird_scores):
-            return "cockatiel"
+            update_result("cockatiel", cockatiel_det["bboxes"])
         else:
-            return "cockatiel" if self.mean(cockatiel_scores) < self.mean(bird_scores) else "bird"
+            if self.mean(cockatiel_scores) < self.mean(bird_scores):
+                update_result("cockatiel", cockatiel_det["bboxes"])
+            else:
+                update_result("bird", bird_det["bboxes"])
+
+        return result
 
 
     def classify(self, image, display=True):
@@ -112,23 +144,21 @@ class HaarCascadeClassifier:
         birds = self.detect(self.bird_clf, gray)
         cockatiels = self.detect(self.cockatiel_clf, gray)
 
-        # print(birds)
-        # print(cockatiels)
+        bird_det = self.get_detections("Bird", birds)
+        cockatiel_det = self.get_detections("Cockatiel", cockatiels)
 
-        bird_det = self.get_detections("Bird", gray, birds)
-        cockatiel_det = self.get_detections("Cockatiel", gray, cockatiels)
+        result = self.parse_result(bird_det, cockatiel_det)
+        frame = self.attach_bounding_boxes(frame, result["bboxes"], result["label"])
 
         if display:
             self.display_cv_image(frame)
 
-        results = {
+        return {
             "frame": frame,
             "bird_scores": bird_det["scores"],
             "cockatiel_scores": cockatiel_det["scores"],
-            "result": self.parse_result(bird_det["scores"], cockatiel_det["scores"])
+            "result": result
         }
-
-        return results
 
 
     def display_cv_image(self, image_mat):
