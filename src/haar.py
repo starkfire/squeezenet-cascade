@@ -121,7 +121,11 @@ class HaarCascadeClassifier:
             result["label"] = label
             result["bboxes"] = bboxes
 
-        if len(bird_scores) > len(cockatiel_scores):
+        if len(bird_scores) == 0 and len(cockatiel_scores) == 0:
+            # immediately return if no instances are detected.
+            # this is to also speed up live mode execution.
+            return result
+        elif len(bird_scores) > len(cockatiel_scores):
             update_result("bird", bird_det["bboxes"])
         elif len(cockatiel_scores) > len(bird_scores):
             update_result("cockatiel", cockatiel_det["bboxes"])
@@ -134,11 +138,15 @@ class HaarCascadeClassifier:
         return result
 
 
-    def classify(self, image, display=True):
+    def classify(self, image, display=True, as_matlike=False):
         """
         Runs the entire object detection/classification process.
         """
-        frame = cv2.imread(image)
+        frame = image
+
+        if not as_matlike:
+            frame = cv2.imread(image)
+
         roi_frame = frame[self.roi_y:self.roi_y+self.roi_h, self.roi_x:self.roi_x+self.roi_w]
         gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
         birds = self.detect(self.bird_clf, gray)
@@ -159,6 +167,25 @@ class HaarCascadeClassifier:
             "cockatiel_scores": cockatiel_det["scores"],
             "result": result
         }
+
+
+    def classify_live(self, camera_index=0):
+        cap = cv2.VideoCapture(camera_index)
+
+        while True:
+            ret, frame = cap.read()
+
+            if not ret:
+                break
+
+            self.classify(frame, display=False, as_matlike=True)
+            cv2.imshow("Cockatiel Variety Detector", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
 
 
     def display_cv_image(self, image_mat):

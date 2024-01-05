@@ -4,6 +4,11 @@ from src.optimizer import HaarOptimizer
 
 
 def run_task(args):
+    if args.task == "live":
+        clf = HaarCascadeClassifier()
+        clf.classify_live()
+        return None
+
     if args.task == "detect":
         clf = HaarCascadeClassifier()
         clf.classify(args.image)
@@ -17,7 +22,7 @@ def run_task(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("task", nargs='?', type=str, default="detect")
+    parser.add_argument("task", nargs='?', type=str, default="live")
     parser.add_argument("--image", '-i', help="Path to an input image")
     parser.add_argument("--dataset", '-d', help="Path to a dataset directory")
 
