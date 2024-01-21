@@ -22,6 +22,8 @@ pip install -r requirements.txt
 
 ## Usage
 
+**NOTE:** `main.py` only currently supports Haar Cascade. SqueezeNet support will be provided in future releases.
+
 ### Live Mode
 
 The default behavior of `main.py` is to run in **live mode**. In this case, the classifier will test each frame that passes through the camera.
@@ -69,3 +71,15 @@ python main.py optimize -d dataset/cockatiel
 ```
 
 Note that this wouldn't affect the classifier's existing state, unless it is modified to use the values.
+
+## Usage (SqueezeNet)
+
+To run the SqueezeNet classifier, you can run `test.py` and provide the path to an input image using the `-i` option:
+
+```sh
+# test against the provided image of a Cardinal
+python test.py -i cardinal.jpg
+
+# test against the provided image of a Cockatiel
+python test.py -i cockatiel.jpg
+```
