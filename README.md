@@ -22,9 +22,9 @@ pip install -r requirements.txt
 
 ## Usage
 
-**NOTE:** `main.py` only currently supports Haar Cascade. SqueezeNet support will be provided in future releases.
+**NOTE:** SqueezeNet is not yet supported for live mode.
 
-### Live Mode
+### Live Mode (Haar Cascade only)
 
 The default behavior of `main.py` is to run in **live mode**. In this case, the classifier will test each frame that passes through the camera.
 
@@ -56,7 +56,15 @@ To detect bird/cockatiel instances from an image:
 python main.py detect -i cockatiel.jpg
 ```
 
-To run the classifier in live mode:
+By default, `main.py`'s **detect** feature runs in Ensemble Method (Haar Cascade + SqueezeNet).
+
+If you want to run "detect" while using only Haar Cascade, include the `--haar` option:
+
+```sh
+python main.py detect -i cockatiel.jpg --haar
+```
+
+To run the classifier in live mode (Haar Cascade only):
 
 ```sh
 python main.py live
