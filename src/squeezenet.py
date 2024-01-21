@@ -163,7 +163,7 @@ class SqueezeNet:
         """
         Private method which consists of the primary model training logic.
         """
-        start = time.time()
+        start_time = time.time()
         num_epochs = self.epochs
 
         for epoch in range(num_epochs):
@@ -220,7 +220,7 @@ class SqueezeNet:
 
                     print("Loss: {:.4f} Accuracy: {:.4f}".format(epoch_loss, epoch_acc.item()))
         
-        time_elapsed = time.time() - start
+        time_elapsed = time.time() - start_time
         print("Training finished in {:.0f}m {:.0f}s".format(time_elapsed // 60, time_elapsed % 60))
 
         if overwrite_model:
@@ -229,10 +229,11 @@ class SqueezeNet:
         return model
 
 
-    def test(self, image_path, model=None, class_ids=["bird", "cockatiel"]):
+    def test(self, image_path, model=None, class_ids=["bird", "cockatiel"], display_probabilities=False):
         """
         Test the model against a test image.
         """
+        start_time = time.time()
         trained_model = self.model if model is None else model
 
         input_image = Image.open(image_path)
@@ -257,6 +258,10 @@ class SqueezeNet:
         categories = self.class_ids if model is None else class_ids
 
         top_prob, top_category_id = torch.topk(probabilities, len(categories))
+        time_elapsed = time.time() - start_time
 
-        for i in range(top_prob.size(0)):
-            print(categories[top_category_id[i]], top_prob[i].item())
+        print("Result: {}, Probability: {}, Inference Time: {:.0f}m {:.6f}s".format(categories[top_category_id[0]], top_prob[0], time_elapsed // 60, time_elapsed % 60))
+
+        if display_probabilities:
+            for i in range(top_prob.size(0)):
+                print(categories[top_category_id[i]], top_prob[i].item())
