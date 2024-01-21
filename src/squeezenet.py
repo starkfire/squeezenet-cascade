@@ -260,8 +260,12 @@ class SqueezeNet:
         top_prob, top_category_id = torch.topk(probabilities, len(categories))
         time_elapsed = time.time() - start_time
 
-        print("Result: {}, Probability: {}, Inference Time: {:.0f}m {:.6f}s".format(categories[top_category_id[0]], top_prob[0], time_elapsed // 60, time_elapsed % 60))
+        print("Label: {}, Probability: {}, Inference Time: {:.0f}m {:.6f}s".format(categories[top_category_id[0]], top_prob[0], time_elapsed // 60, time_elapsed % 60))
 
         if display_probabilities:
             for i in range(top_prob.size(0)):
                 print(categories[top_category_id[i]], top_prob[i].item())
+
+        return {"label": categories[top_category_id[0]],
+                "probability": top_prob[0],
+                "inference_time": "{:.0f}m {:.6f}s".format(time_elapsed // 60, time_elapsed % 60)}
