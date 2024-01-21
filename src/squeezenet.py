@@ -54,9 +54,9 @@ class SqueezeNet:
         self.stages = ['train', 'val', 'test']
 
         # percentage of dataset used for training, validation, and testing set
-        self.train_ratio = 0.90
-        self.val_ratio = 0.05
-        self.test_ratio = 0.05
+        self.train_ratio = 0.80
+        self.val_ratio = 0.10
+        self.test_ratio = 0.10
 
         # higher batch size = higher memory consumption = faster training
         # lower batch size = less memory consumption = slower training = more detail
