@@ -1,6 +1,7 @@
 import argparse
 from src.haar import HaarCascadeClassifier
 from src.optimizer import HaarOptimizer
+from src.ensemble import EnsembleClassifier 
 
 
 def run_task(args):
@@ -10,7 +11,13 @@ def run_task(args):
         return None
 
     if args.task == "detect":
-        clf = HaarCascadeClassifier()
+        clf = HaarCascadeClassifier() if args.haar else EnsembleClassifier()
+        
+        if isinstance(clf, EnsembleClassifier):
+            print("Using Ensemble Method")
+        else:
+            print("Using Haar Classifier")
+
         clf.classify(args.image)
         return None
 
@@ -26,6 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("--image", '-i', help="Path to an input image")
     parser.add_argument("--dataset", '-d', help="Path to a dataset directory")
     parser.add_argument("--camera", '-c', nargs='?', type=int, default=0, help="Index of the camera that will be used by cv2.VideoCapture()")
+    parser.add_argument("--haar", default=False, action=argparse.BooleanOptionalAction, help="If provided, this will only use the Haar Classifier instead of Ensemble Method (Haar + SqueezeNet).")
 
     args = parser.parse_args()
 
