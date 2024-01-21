@@ -1,153 +1,20 @@
-import cv2
-import os
+from .haar import HaarCascadeClassifier
 from .squeezenet import SqueezeNet
+import cv2
 
-DEFAULT_BIRD_CLF_PATH = "../pretrained/bird15stages.xml"
-DEFAULT_COCKATIEL_CLF_PATH = "../pretrained/cockatiel15stages.xml"
 DEFAULT_SQUEEZENET_CLF_PATH = "../pretrained/model.pt"
 
-class EnsembleClassifier:
+class EnsembleClassifier(HaarCascadeClassifier):
 
-    def __init__(self, 
-                 bird_clf_path=DEFAULT_BIRD_CLF_PATH, 
-                 cockatiel_clf_path=DEFAULT_COCKATIEL_CLF_PATH,
-                 squeezenet_clf_path=DEFAULT_SQUEEZENET_CLF_PATH):
-        self.bird_clf = self.import_model(bird_clf_path)
-        self.cockatiel_clf = self.import_model(cockatiel_clf_path)
+    def __init__(self, squeezenet_clf_path=DEFAULT_SQUEEZENET_CLF_PATH):
+        super().__init__()
         self.squeezenet_clf = SqueezeNet()
         self.squeezenet_clf.load_custom_model(squeezenet_clf_path)
 
-        # threshold
-        # self.bird_threshold = 1.351643598615917e-05
-        # self.cockatiel_threshold = 1.3819598955238318e-05
-      
-        # threshold (optimizer)
-        self.bird_threshold = 3.0046271257736914e-05
-        self.cockatiel_threshold = 1.814486863115111e-05
-
-        self.roi_x = 100
-        self.roi_y = 100
-        self.roi_w = 500
-        self.roi_h = 500
-
-        # detectMultiScale parameters
-        self.scaleFactor = 1.124
-        self.minNeighbors = 10
-        self.minSize = (224, 224)
-
-        # bounding box parameters
-        self.bird_bbox_color = (0, 255, 0)
-        self.cockatiel_bbox_color = (0, 0, 255)
-
-    
-    def import_model(self, model_path):
-        """
-        Method for importing a Cascade Classifier model from XML
-        """
-        dirname = os.path.dirname(__file__)
-        filepath = os.path.join(dirname, model_path)
-        return cv2.CascadeClassifier(filepath)
-
-    
-    def get_roi(self, image, x, y, w, h):
-        """
-        Helper method for returning the Region of Interest (ROI)
-        """
-        return image[y:y+h, x:x+w]
-
-
-    def detect(self, classifier, frame):
-        """
-        Method which simply performs a call to cv2.CascadeClassifier.detectMultiScale().
-        In short, it performs the detection process using Haar Cascade.
-        """
-        return classifier.detectMultiScale(frame,
-                                           scaleFactor=self.scaleFactor,
-                                           minNeighbors=self.minNeighbors,
-                                           minSize=self.minSize)
-
-
-    def get_detections(self, label, outputs):
-        """
-        Calculates the confidence/scores for each detected instance.
-        """
-        confidence_scores = []
-        bbox_regions = []
-        labels = []
-
-        for (x, y, w, h) in outputs:
-            confidence = len(outputs) / (w * h)
-            # threshold = self.cockatiel_threshold if label.lower() == "cockatiel" else self.bird_threshold
-            
-            confidence_scores.append(confidence)
-            bbox_regions.append((x, y, w, h))
-            labels.append(label.lower())
-
-        return {
-            "scores": confidence_scores,
-            "bboxes": bbox_regions,
-            "labels": labels
-        }
-
-
-    def attach_bounding_boxes(self, frame, bboxes, label):
-        """
-        Method for attaching bounding boxes based on provided lists
-        of bounding box coordinates and labels.
-        """
-        for (x, y, w, h) in bboxes:
-            bbox_color = self.cockatiel_bbox_color if label.lower() == "cockatiel" else self.bird_bbox_color
-            
-            cv2.rectangle(frame, (x, y), (x+w, y+h), bbox_color, 2)
-            cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.68, bbox_color, 2)
-
-        return frame
-
-
-    def mean(self, numbers):
-        """
-        Helper method for calculating Mean.
-        """
-        return sum(numbers) / len(numbers)
-
-
-    def parse_result(self, bird_det, cockatiel_det): 
-        """
-        Determines the final detected object based on input scores.
-        """
-        bird_scores = bird_det["scores"]
-        cockatiel_scores = cockatiel_det["scores"]
-
-        result = {
-            "score": 0,
-            "label": "",
-            "bboxes": []
-        }
-
-        def update_result(label, bboxes):
-            result["label"] = label
-            result["bboxes"] = bboxes
-
-        if len(bird_scores) == 0 and len(cockatiel_scores) == 0:
-            # immediately return if no instances are detected.
-            # this is to also speed up live mode execution.
-            return result
-        elif len(bird_scores) > len(cockatiel_scores):
-            update_result("bird", bird_det["bboxes"])
-        elif len(cockatiel_scores) > len(bird_scores):
-            update_result("cockatiel", cockatiel_det["bboxes"])
-        else:
-            if self.mean(cockatiel_scores) < self.mean(bird_scores):
-                update_result("cockatiel", cockatiel_det["bboxes"])
-            else:
-                update_result("bird", bird_det["bboxes"])
-
-        return result
-
-
+    # override
     def classify(self, image, display=True, as_matlike=False):
         """
-        Runs the entire object detection/classification process.
+        Runs the entire object detection + classification process.
         """
         frame = image
 
@@ -156,6 +23,8 @@ class EnsembleClassifier:
 
         roi_frame = frame[self.roi_y:self.roi_y+self.roi_h, self.roi_x:self.roi_x+self.roi_w]
         gray = cv2.cvtColor(roi_frame, cv2.COLOR_BGR2GRAY)
+
+        # Haar Cascade
         birds = self.detect(self.bird_clf, gray)
         cockatiels = self.detect(self.cockatiel_clf, gray)
 
@@ -163,10 +32,14 @@ class EnsembleClassifier:
         cockatiel_det = self.get_detections("Cockatiel", cockatiels)
 
         haar_result = self.parse_result(bird_det, cockatiel_det)
+
+        # SqueezeNet
         snet_result = self.squeezenet_clf.test(image)
 
         print("[SqueezeNet Result] Label: {}, Probability: {}, Time: {}".format(snet_result["label"], snet_result["probability"], snet_result["inference_time"]))
         
+        # use bounding boxes from Haar Cascade
+        # use label from SqueezeNet
         frame = self.attach_bounding_boxes(frame, haar_result["bboxes"], snet_result["label"])
 
         if display:
@@ -174,35 +47,5 @@ class EnsembleClassifier:
 
         return {
             "frame": frame,
-            "bird_scores": bird_det["scores"],
-            "cockatiel_scores": cockatiel_det["scores"],
             "result": snet_result["label"]
         }
-
-
-    def classify_live(self, camera_index=0):
-        cap = cv2.VideoCapture(camera_index)
-
-        while True:
-            ret, frame = cap.read()
-
-            if not ret:
-                break
-
-            self.classify(frame, display=False, as_matlike=True)
-            cv2.imshow("Cockatiel Variety Detector", frame)
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-        cap.release()
-        cv2.destroyAllWindows()
-
-
-    def display_cv_image(self, image_mat):
-        """
-        Method to display resulting image matrices using OpenCV
-        """
-        cv2.imshow('image', image_mat)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
