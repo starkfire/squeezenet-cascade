@@ -76,7 +76,7 @@ class SqueezeNet:
         """
         Use a custom SqueezeNet model in form of a .pt file
         """
-        self.model = torch.load(path_to_pt)
+        self.model = torch.load(path_to_pt, map_location=self.device)
 
 
     def export_model(self, path_to_pt):
