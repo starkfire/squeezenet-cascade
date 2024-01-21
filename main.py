@@ -12,8 +12,8 @@ def run_task(args):
 
     if args.task == "detect":
         clf = HaarCascadeClassifier() if args.haar else EnsembleClassifier()
-        
-        if isinstance(clf, EnsembleClassifier):
+
+        if not args.haar:
             print("Using Ensemble Method")
         else:
             print("Using Haar Classifier")
