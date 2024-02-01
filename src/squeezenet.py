@@ -60,9 +60,9 @@ class SqueezeNet:
         self.stages = ['train', 'val', 'test']
 
         # percentage of dataset used for training, validation, and testing set
-        self.train_ratio = 0.80
-        self.val_ratio = 0.10
-        self.test_ratio = 0.10
+        self.train_ratio = 0.8
+        self.val_ratio = 0.1
+        self.test_ratio = 0.1
 
         # higher batch size = higher memory consumption = faster training
         # lower batch size = less memory consumption = slower training = more detail
@@ -79,6 +79,13 @@ class SqueezeNet:
         
         # use the CPU if this script is executed on a non-CUDA-enabled machine
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+        # default transforms for image augmentation
+        self.transform = transforms.Compose([
+            transforms.Resize([256, 256]),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5], std=[0.5])
+        ])
 
 
     def load_custom_model(self, path_to_pt):
@@ -101,22 +108,26 @@ class SqueezeNet:
         """
         Create a label map for the dataset
         """
+        print(self.class_ids)
         X = []
         y = []
         filenames = []
 
         for class_id in self.class_ids:
-            for file in os.listdir(os.path.join(os.getcwd(), self.path_to_dataset, class_id)):
-                X.append(os.path.join(os.getcwd(), self.path_to_dataset, class_id, file))
-                y.append(class_id)
-                filenames.append(file)
+            dirpath = os.path.join(os.getcwd(), self.path_to_dataset, class_id)
 
+            for file in os.listdir(dirpath):
+                if file.lower().endswith(('.png', '.jpeg', '.jpg')):
+                    X.append(os.path.join(dirpath, file))
+                    y.append(class_id)
+                    filenames.append(file)
+        
         self.labels = pd.DataFrame(list(zip(X, filenames, y)), columns=['fileloc', 'filename', 'classid'])
         self.labels['int_class_id'] = self.labels['classid'].astype('category').cat.codes
 
+        # print the entire dataframe
         if display:
-            print(self.labels.head())
-            print(self.labels.tail())
+            print(self.labels.to_string())
 
 
     def create_dataset(self):
@@ -130,17 +141,10 @@ class SqueezeNet:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=1 - self.train_ratio, stratify=y, random_state=0)
         X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=self.test_ratio/(self.test_ratio + self.val_ratio), random_state=0)
 
-        transform = transforms.Compose([
-            transforms.Resize([256, 256]),
-            # transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])
-        ])
-
         image_datasets = {
-            'train': CustomDataset(X_train.values, y_train.values, self.batch_size, transform),
-            'val': CustomDataset(X_val.values, y_val.values, self.batch_size, transform),
-            'test': CustomDataset(X_test.values, y_test.values, self.batch_size, transform)
+            'train': CustomDataset(X_train.values, y_train.values, self.batch_size, self.transform),
+            'val': CustomDataset(X_val.values, y_val.values, self.batch_size, self.transform),
+            'test': CustomDataset(X_test.values, y_test.values, self.batch_size, self.transform)
         }
 
         self.dataloaders = {
@@ -178,7 +182,7 @@ class SqueezeNet:
         num_epochs = self.epochs
 
         for epoch in range(num_epochs):
-            print("Epoch {}/{}".format(epoch, num_epochs))
+            print("Epoch {}/{}".format(epoch + 1, num_epochs))
             print("-" * 10)
 
             for phase in ['train', 'val']:
@@ -248,12 +252,7 @@ class SqueezeNet:
         trained_model = self.model if model is None else model
 
         input_image = Image.open(image_path)
-        preprocess = transforms.Compose([
-            transforms.Resize([256, 256]),
-            # transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])
-        ])
+        preprocess = self.transform
 
         input_tensor = preprocess(input_image)
         input_batch = input_tensor.unsqueeze(0)
