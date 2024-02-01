@@ -15,6 +15,7 @@ import math
 import matplotlib.pyplot as plt
 import time
 
+DEFAULT_CLASS_IDS = ["bird", "cinnamon", "lutino", "pearl", "pied", "whiteface"]
 
 class CustomDataset(Dataset):
 
@@ -46,7 +47,7 @@ class CustomDataset(Dataset):
 
 class SqueezeNet:
 
-    def __init__(self, path_to_dataset='dataset', class_ids=["bird", "cockatiel"], epochs=10, batch_size=4):
+    def __init__(self, path_to_dataset='dataset', class_ids=DEFAULT_CLASS_IDS, epochs=10, batch_size=4):
         self.path_to_dataset = path_to_dataset
         self.class_ids = class_ids
 
@@ -231,7 +232,7 @@ class SqueezeNet:
         return model
 
 
-    def test(self, image_path, model=None, class_ids=["bird", "cockatiel"], display_probabilities=False):
+    def test(self, image_path, model=None, class_ids=DEFAULT_CLASS_IDS, show_probabilities=False):
         """
         Test the model against a test image.
         """
@@ -264,7 +265,7 @@ class SqueezeNet:
 
         print("Label: {}, Probability: {}, Inference Time: {:.0f}m {:.6f}s".format(categories[top_category_id[0]], top_prob[0], time_elapsed // 60, time_elapsed % 60))
 
-        if display_probabilities:
+        if show_probabilities:
             for i in range(top_prob.size(0)):
                 print(categories[top_category_id[i]], top_prob[i].item())
 
