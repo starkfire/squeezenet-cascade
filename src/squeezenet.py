@@ -159,7 +159,9 @@ class SqueezeNet:
         Method for training/fine-tuning the SqueezeNet model
         """
         # update the last 2D convolution layer, so that the number of
-        # output channels will match the number of classes
+        # output channels will match the number of classes. This is so
+        # that we'll get outputs that depend on the classes we defined,
+        # since SqueezeNet does not have a linear layer as its last layer.
         self.model.classifier._modules["1"] = torch.nn.Conv2d(512, len(self.class_ids), kernel_size=(1, 1))
         self.model.num_classes = len(self.class_ids)
 
@@ -223,19 +225,19 @@ class SqueezeNet:
                             torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
                             optimizer.step()
 
-                        # statistics
-                        running_loss += loss.item() * inputs.size(0)
+                    # statistics
+                    running_loss += loss.item() * inputs.size(0)
 
-                        predicted = torch.max(outputs.data, 1)[1]
-                        running_corrects += (predicted == labels).sum()
+                    predicted = torch.max(outputs.data, 1)[1]
+                    running_corrects += (predicted == labels).sum()
 
-                    if phase == 'train':
-                        scheduler.step()
+                if phase == 'train':
+                    scheduler.step()
 
-                    epoch_loss = running_loss / self.dataset_sizes[phase]
-                    epoch_acc = running_corrects / self.dataset_sizes[phase]
+                epoch_loss = running_loss / self.dataset_sizes[phase]
+                epoch_acc = running_corrects / self.dataset_sizes[phase]
 
-                    print("Loss: {:.4f} Accuracy: {:.4f}".format(epoch_loss, epoch_acc.item()))
+                print("Loss: {:.4f} Accuracy: {:.4f}".format(epoch_loss, epoch_acc.item()))
         
         time_elapsed = time.time() - start_time
         print("Training finished in {:.0f}m {:.0f}s".format(time_elapsed // 60, time_elapsed % 60))
