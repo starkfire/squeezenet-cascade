@@ -158,7 +158,9 @@ class SqueezeNet:
         """
         Method for training/fine-tuning the SqueezeNet model
         """
-        self.model.classifier._modules["1"] = torch.nn.Conv2d(512, 5, kernel_size=(1, 1))
+        # update the last 2D convolution layer, so that the number of
+        # output channels will match the number of classes
+        self.model.classifier._modules["1"] = torch.nn.Conv2d(512, len(self.class_ids), kernel_size=(1, 1))
         self.model.num_classes = len(self.class_ids)
 
         for param in self.model.parameters():
