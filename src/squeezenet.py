@@ -47,7 +47,12 @@ class CustomDataset(Dataset):
 
 class SqueezeNet:
 
-    def __init__(self, path_to_dataset='dataset', class_ids=DEFAULT_CLASS_IDS, epochs=10, batch_size=4):
+    def __init__(self, 
+                 path_to_dataset='dataset', 
+                 class_ids=DEFAULT_CLASS_IDS, 
+                 epochs=10, 
+                 batch_size=4,
+                 learning_rate = 0.01):
         self.path_to_dataset = path_to_dataset
         self.class_ids = class_ids
 
@@ -65,6 +70,9 @@ class SqueezeNet:
 
         # number of iterations around the dataset
         self.epochs = epochs
+
+        # learning rate value, which we will pass to the optimizer
+        self.learning_rate = learning_rate
         
         # use SqueezeNet with pre-trained weights from the ImageNet dataset
         self.model = models.squeezenet1_1(pretrained=True)
@@ -156,7 +164,7 @@ class SqueezeNet:
             param.requires_grad = True
 
         criterion = torch.nn.CrossEntropyLoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=0.01)
+        optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
         return self.__train_model(self.model.to(self.device), criterion, optimizer, scheduler, overwrite_model)
