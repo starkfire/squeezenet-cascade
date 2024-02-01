@@ -124,7 +124,7 @@ class SqueezeNet:
 
         transform = transforms.Compose([
             transforms.Resize([256, 256]),
-            transforms.CenterCrop(224),
+            # transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.5], std=[0.5])
         ])
@@ -242,7 +242,7 @@ class SqueezeNet:
         input_image = Image.open(image_path)
         preprocess = transforms.Compose([
             transforms.Resize([256, 256]),
-            transforms.CenterCrop(224),
+            # transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.5], std=[0.5])
         ])
