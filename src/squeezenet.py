@@ -8,6 +8,7 @@ import torchvision.transforms as transforms
 from sklearn.model_selection import train_test_split
 from torcheval.metrics.functional import multiclass_confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
+from torchmetrics import Accuracy, F1Score, Precision, Recall
 
 import pandas as pd
 import numpy as np
@@ -16,6 +17,8 @@ import os
 import math
 import matplotlib.pyplot as plt
 import time
+
+from typing import Literal
 
 DEFAULT_CLASS_IDS = ["cinnamon", "lutino", "pearl", "pied", "whiteface"]
 
@@ -304,8 +307,63 @@ class SqueezeNet:
         disp.plot()
         plt.show()
 
+
+    def __get_precision(self,
+                        actual: torch.Tensor,
+                        predicted: torch.Tensor,
+                        class_ids: list[str] = DEFAULT_CLASS_IDS, 
+                        average: Literal['micro', 'macro', 'weighted', 'none'] = 'micro'):
+        """
+        Get the precision from actual values and predicted values.
+        """
+        precision = Precision(task="multiclass", average=average, num_classes=len(class_ids))
+        
+        return precision(predicted, actual)
+
     
-    def eval(self, class_ids=DEFAULT_CLASS_IDS, model=None):
+    def __get_recall(self,
+                     actual: torch.Tensor,
+                     predicted: torch.Tensor,
+                     class_ids: list[str] = DEFAULT_CLASS_IDS,
+                     average: Literal['micro', 'macro', 'weighted', 'none'] = 'micro'):
+        """
+        Get the recall from actual values and predicted values.
+        """
+        recall = Recall(task="multiclass", average=average, num_classes=len(class_ids))
+
+        return recall(predicted, actual)
+
+    
+    def __get_accuracy(self,
+                       actual: torch.Tensor,
+                       predicted: torch.Tensor,
+                       class_ids: list[str] = DEFAULT_CLASS_IDS,
+                       average: Literal['micro', 'macro', 'weighted', 'none'] = 'micro'):
+        """
+        Get the accuracy based on actual and predicted values.
+        """
+        accuracy = Accuracy(task="multiclass", average=average, num_classes=len(class_ids))
+
+        return accuracy(predicted, actual)
+
+
+    def __get_f1_score(self,
+                       actual: torch.Tensor,
+                       predicted: torch.Tensor,
+                       class_ids: list[str] = DEFAULT_CLASS_IDS,
+                       average: Literal['micro', 'macro', 'weighted', 'none'] = 'micro'):
+        """
+        Get the F-1 score.
+        """
+        f1_score = F1Score(task="multiclass", num_classes=len(class_ids), average=average)
+
+        return f1_score(predicted, actual)
+
+    
+    def eval(self, 
+             class_ids=DEFAULT_CLASS_IDS, 
+             model=None,
+             average: Literal['micro', 'macro', 'weighted', 'none'] = 'micro'):
         """
         Evaluate the model and get relevant metrics (e.g. confusion matrix).
         """
@@ -353,10 +411,21 @@ class SqueezeNet:
             predicted.append(torch.argmax(output[0]).item())
         
         # convert predictions to tensor
-        target = torch.tensor(predicted)
+        preds = torch.tensor(predicted)
 
         # conf matrix
-        conf_mat = multiclass_confusion_matrix(actual, target, len(class_ids))
+        conf_mat = multiclass_confusion_matrix(actual, preds, len(class_ids))
 
         # display confusion matrix
         self.__display_confusion_matrix(conf_mat)
+
+        # get precision, recall, and accuracy
+        precision = self.__get_precision(actual, preds, average=average, class_ids=class_ids)
+        recall = self.__get_recall(actual, preds, average=average, class_ids=class_ids)
+        accuracy = self.__get_accuracy(actual, preds, average=average, class_ids=class_ids)
+        f1_score = self.__get_f1_score(actual, preds, average=average, class_ids=class_ids)
+
+        print("Precision: {}".format(precision))
+        print("Recall: {}".format(recall))
+        print("Accuracy: {}".format(accuracy))
+        print("F-1 Score: {}".format(f1_score))
