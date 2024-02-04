@@ -93,8 +93,8 @@ class SqueezeNet:
         """
         Use a custom SqueezeNet model in form of a .pt file
         """
-        dirname = os.path.dirname(__file__)
-        filepath = os.path.join(dirname, path_to_pt)
+        #dirname = os.path.dirname(__file__)
+        filepath = os.path.join(os.getcwd(), path_to_pt)
         self.model = torch.load(filepath, map_location=self.device)
 
 
