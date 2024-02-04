@@ -6,6 +6,8 @@ from torchvision import models
 import torchvision.transforms as transforms
 
 from sklearn.model_selection import train_test_split
+from torcheval.metrics.functional import multiclass_confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay
 
 import pandas as pd
 import numpy as np
@@ -15,7 +17,7 @@ import math
 import matplotlib.pyplot as plt
 import time
 
-DEFAULT_CLASS_IDS = ["bird", "cinnamon", "lutino", "pearl", "pied", "whiteface"]
+DEFAULT_CLASS_IDS = ["cinnamon", "lutino", "pearl", "pied", "whiteface"]
 
 class CustomDataset(Dataset):
 
@@ -33,8 +35,7 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, idx):
         class_id = self.y[idx]
-        img = Image.open(self.X[idx])
-        img = img.convert("RGBA").convert("RGB")
+        img = Image.open(self.X[idx]).convert("RGB")
         img = self.transform(img)
 
         return img, torch.tensor(int(class_id))
@@ -108,7 +109,6 @@ class SqueezeNet:
         """
         Create a label map for the dataset
         """
-        print(self.class_ids)
         X = []
         y = []
         filenames = []
@@ -283,3 +283,80 @@ class SqueezeNet:
         return {"label": categories[top_category_id[0]],
                 "probability": top_prob[0],
                 "inference_time": "{:.0f}m {:.6f}s".format(time_elapsed // 60, time_elapsed % 60)}
+
+
+    def __display_confusion_matrix(self, 
+                                   input_tensor: np.ndarray | torch.Tensor, 
+                                   class_ids: list[str] = DEFAULT_CLASS_IDS):
+        """
+        Provides a visual representation of a confusion matrix, given a valid
+        tensor. The input tensor must have a shape of (m x m), where m is the
+        number of labels/classes.
+        """
+        
+        # convert input tensor to numpy array
+        if isinstance(input_tensor, torch.Tensor):
+            input_tensor = input_tensor.numpy()
+
+        disp = ConfusionMatrixDisplay(confusion_matrix=input_tensor,
+                                      display_labels=class_ids)
+
+        disp.plot()
+        plt.show()
+
+    
+    def eval(self, class_ids=DEFAULT_CLASS_IDS, model=None):
+        """
+        Evaluate the model and get relevant metrics (e.g. confusion matrix).
+        """
+
+        # if the label map is not yet defined, generate the label map
+        # and prepare the dataset, based on the input path to dataset
+        # that is specified when the SqueezeNet class is instantiated
+        if self.labels.shape[0] == 0:
+            self.generate_labels()
+            self.create_dataset()
+
+        # get the class IDs from the dataset's label map
+        int_class_ids = pd.DataFrame(self.labels[["int_class_id"]])
+        dataset_class_ids = int_class_ids.apply(lambda x: x.iloc[0], axis=1)
+        
+        # list of predicted indexes
+        predicted = []
+
+        # convert to a tensor that can be passed to PyTorch's confusion matrix function
+        actual = torch.tensor(dataset_class_ids)
+
+        # iterate through each file in the dataset
+        filepaths = self.labels[["fileloc"]].apply(lambda x: x.iloc[0], axis=1).tolist()
+
+        # import trained model
+        trained_model = self.model if model is None else model
+
+        # define image augmentation transforms
+        preprocess = self.transform
+
+        # check if CUDA is available
+        cuda_is_available = torch.cuda.is_available()
+        
+        for filepath in filepaths:
+            input_image = Image.open(filepath)
+            input_tensor = preprocess(input_image)
+            input_batch = input_tensor.unsqueeze(0)
+
+            input_batch = input_batch.to("cuda" if cuda_is_available else "cpu")
+            trained_model.to("cuda" if cuda_is_available else "cpu")
+
+            with torch.no_grad():
+                output = trained_model(input_batch)
+
+            predicted.append(torch.argmax(output[0]).item())
+        
+        # convert predictions to tensor
+        target = torch.tensor(predicted)
+
+        # conf matrix
+        conf_mat = multiclass_confusion_matrix(actual, target, len(class_ids))
+
+        # display confusion matrix
+        self.__display_confusion_matrix(conf_mat)
