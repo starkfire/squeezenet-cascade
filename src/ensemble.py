@@ -17,6 +17,7 @@ class EnsembleClassifier(HaarCascadeClassifier):
         Runs the entire object detection + classification process.
         """
         frame = image
+        result_label = ""
 
         if not as_matlike:
             frame = cv2.imread(image)
@@ -33,19 +34,25 @@ class EnsembleClassifier(HaarCascadeClassifier):
 
         haar_result = self.parse_result(bird_det, cockatiel_det)
 
-        # SqueezeNet
-        snet_result = self.squeezenet_clf.test(image)
+        # if the Haar classifier detects a cockatiel, run the SqueezeNet classifier
+        if haar_result["label"] == "cockatiel":
+            snet_result = self.squeezenet_clf.test(image)
 
-        print("[SqueezeNet Result] Label: {}, Probability: {}, Time: {}".format(snet_result["label"], snet_result["probability"], snet_result["inference_time"]))
-        
-        # use bounding boxes from Haar Cascade
-        # use label from SqueezeNet
-        frame = self.attach_bounding_boxes(frame, haar_result["bboxes"], snet_result["label"])
+            print("[SqueezeNet Result] Label: {}, Probability: {}, Time: {}".format(snet_result["label"], snet_result["probability"], snet_result["inference_time"]))
+            
+            # use bounding boxes from Haar, and use label from SqueezeNet
+            frame = self.attach_bounding_boxes(frame, haar_result["bboxes"], snet_result["label"])
+
+            result_label = snet_result["label"]
+        else:
+            frame = self.attach_bounding_boxes(frame, haar_result["bboxes"], "bird")
+
+            result_label = "bird"
 
         if display:
             self.display_cv_image(frame)
 
         return {
             "frame": frame,
-            "result": snet_result["label"]
+            "result": result_label
         }
