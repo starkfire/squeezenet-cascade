@@ -251,14 +251,15 @@ class SqueezeNet:
         return model
 
 
-    def test(self, image_path, model=None, class_ids=DEFAULT_CLASS_IDS, show_probabilities=False):
+    def test(self, image, model=None, class_ids=DEFAULT_CLASS_IDS, show_probabilities=False, as_matlike=False):
         """
-        Test the model against a test image.
+        Test the model against an input image.
         """
+        input_image = Image.open(image) if not as_matlike else Image.fromarray(image)
+
         start_time = time.time()
         trained_model = self.model if model is None else model
 
-        input_image = Image.open(image_path)
         preprocess = self.transform
 
         input_tensor = preprocess(input_image)
