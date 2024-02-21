@@ -11,6 +11,13 @@ class EnsembleClassifier(HaarCascadeClassifier):
         self.squeezenet_clf = SqueezeNet()
         self.squeezenet_clf.load_custom_model(squeezenet_clf_path)
 
+        self.bbox_colors = {"bird": (0, 255, 0),
+                            "cinnamon": (255, 0, 0),
+                            "lutino": (0, 0, 255),
+                            "pearl": (0, 255, 255),
+                            "pied": (255, 255, 0),
+                            "whiteface": (255, 0, 255)}
+
     # override
     def classify(self, image, display=True, as_matlike=False):
         """
@@ -64,7 +71,22 @@ class EnsembleClassifier(HaarCascadeClassifier):
             "result": result_label
         }
 
+    # override
+    def attach_bounding_boxes(self, frame, bboxes, label):
+        """
+        Overrides the attach_bounding_boxes() method from HaarCascadeClassifier
+        by colorizing bounding boxes for different cockatiel species.
+        """
+        for (x, y, w, h) in bboxes:
+            bbox_color = self.bbox_colors[label]
+            
+            cv2.rectangle(frame, (x, y), (x+w, y+h), bbox_color, 2)
+            cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.68, bbox_color, 2)
+
+        return frame
+
     
+    # override
     def classify_live(self, camera_index=0):
         cap = cv2.VideoCapture(camera_index)
 
