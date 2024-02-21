@@ -36,7 +36,14 @@ class EnsembleClassifier(HaarCascadeClassifier):
 
         # if the Haar classifier detects a cockatiel, run the SqueezeNet classifier
         if haar_result["label"] == "cockatiel":
-            snet_result = self.squeezenet_clf.test(image)
+            snet_result = None
+
+            # if the input image is not MatLike, pass the path to the image instead
+            # of the processed 'frame'
+            if not as_matlike:
+                snet_result = self.squeezenet_clf.test(image)
+            else:
+                snet_result = self.squeezenet_clf.test(frame, as_matlike=True)
 
             print("[SqueezeNet Result] Label: {}, Probability: {}, Time: {}".format(snet_result["label"], snet_result["probability"], snet_result["inference_time"]))
             
@@ -56,3 +63,22 @@ class EnsembleClassifier(HaarCascadeClassifier):
             "frame": frame,
             "result": result_label
         }
+
+    
+    def classify_live(self, camera_index=0):
+        cap = cv2.VideoCapture(camera_index)
+
+        while True:
+            ret, frame = cap.read()
+
+            if not ret:
+                break
+
+            self.classify(frame, display=False, as_matlike=True)
+            cv2.imshow("Cockatiel Variety Detector", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        cap.release()
+        cv2.destroyAllWindows()
