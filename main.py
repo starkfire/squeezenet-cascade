@@ -6,7 +6,7 @@ from src.ensemble import EnsembleClassifier
 
 def run_task(args):
     if args.task == "live":
-        clf = HaarCascadeClassifier()
+        clf = HaarCascadeClassifier() if args.haar else EnsembleClassifier()
         clf.classify_live(camera_index=args.camera)
         return None
 
