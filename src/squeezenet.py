@@ -188,6 +188,9 @@ class SqueezeNet:
         start_time = time.time()
         num_epochs = self.epochs
 
+        total_loss = []
+        total_acc = []
+
         for epoch in range(num_epochs):
             print("Epoch {}/{}".format(epoch + 1, num_epochs))
             print("-" * 10)
@@ -221,8 +224,7 @@ class SqueezeNet:
                         outputs = model(inputs)
                         loss = criterion(outputs.float(), labels)
 
-                        # backward
-                        # optimize only if in training phase
+                        # update weights when in training mode
                         if phase == 'train':
                             loss.backward()
                             torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
@@ -231,22 +233,52 @@ class SqueezeNet:
                     # statistics
                     running_loss += loss.item() * inputs.size(0)
 
+                    total_loss.append(float(running_loss))
+
                     predicted = torch.max(outputs.data, 1)[1]
                     running_corrects += (predicted == labels).sum()
 
+                    if phase == 'train':
+                        total_loss.append(float(running_loss))
+                        total_acc.append(float(running_corrects))
+                    
+                    print("Loss: {:.4f}, Accuracy: {:.4f}".format(float(running_loss), float(running_corrects)))
+
+                # in training mode, after each epoch, allow
+                # the learning rate to decay
                 if phase == 'train':
                     scheduler.step()
 
                 epoch_loss = running_loss / self.dataset_sizes[phase]
                 epoch_acc = running_corrects / self.dataset_sizes[phase]
 
-                print("Loss: {:.4f} Accuracy: {:.4f}".format(epoch_loss, epoch_acc.item()))
+                print("Epoch Loss: {:.4f}, Epoch Accuracy: {:.4f}".format(epoch_loss, epoch_acc.item()))
         
+        # calculate time it took for the entire training process to finish
         time_elapsed = time.time() - start_time
         print("Training finished in {:.0f}m {:.0f}s".format(time_elapsed // 60, time_elapsed % 60))
 
+        # export entire model
+        timestamp = time.time()
+        torch.save(self.model, f"model_{self.epochs}-epochs_{timestamp}.pt")
+        # export as state dict
+        torch.save(self.model.state_dict(), f"model_{self.epochs}-epochs_{timestamp}_state-dict.pt")
+        
+        # if true, the class instance's model property will be set to the newly trained model
         if overwrite_model:
             self.model = model
+
+        # visualize metrics
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+
+        ax1.plot(np.array(total_loss))
+        ax1.set_ylabel("Running Loss")
+
+        ax2.plot(np.array(total_acc))
+        ax2.set_ylabel("Running Accuracy")
+        ax2.set_xlabel(f"Iteration No. ({self.epochs} epochs)")
+        
+        plt.show()
 
         return model
 
