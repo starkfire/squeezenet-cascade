@@ -330,7 +330,7 @@ class SqueezeNet:
 
 
     def __display_confusion_matrix(self, 
-                                   input_tensor: np.ndarray | torch.Tensor, 
+                                   input_tensor, 
                                    class_ids: list[str] = DEFAULT_CLASS_IDS):
         """
         Provides a visual representation of a confusion matrix, given a valid
@@ -455,10 +455,7 @@ class SqueezeNet:
         preds = torch.tensor(predicted)
 
         # conf matrix
-        conf_mat = multiclass_confusion_matrix(actual, preds, len(class_ids))
-
-        # display confusion matrix
-        self.__display_confusion_matrix(conf_mat)
+        conf_mat = multiclass_confusion_matrix(preds, actual, len(class_ids))
 
         # get precision, recall, and accuracy
         precision = self.__get_precision(actual, preds, average=average, class_ids=class_ids)
@@ -470,3 +467,7 @@ class SqueezeNet:
         print("Recall: {}".format(recall))
         print("Accuracy: {}".format(accuracy))
         print("F-1 Score: {}".format(f1_score))
+
+        # display confusion matrix
+        self.__display_confusion_matrix(conf_mat)
+
