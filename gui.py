@@ -20,6 +20,8 @@ import argparse
 import cv2
 import numpy as np
 import sys
+import os
+import io
 
 # classifier classes
 from src.ensemble import EnsembleClassifier
@@ -34,35 +36,116 @@ class VideoThread(QThread):
         self.camera_index = camera_index
         self.target_classifier = target_classifier
 
+    
     def switch_classifier(self, target_classifier):
+        """
+        Setter for the `target_classifier` property.
+        """
         self.target_classifier = target_classifier
+
+
+    def is_raspberry_pi(self):
+        """
+        Check if the hardware where this program runs on is using chips
+        that are specific to Raspberry Pi. This is used by VideoThread
+        to identify whether Picamera2 or OpenCV should be used.
+        """
+        try:
+            if os.name != 'posix':
+                return False
+
+            chips = ('BCM2708', 'BCM2709', 'BCM2711', 'BCM2835', 'BCM2836')
+
+            with io.open('/proc/cpuinfo', 'r') as cpuinfo:
+                for line in cpuinfo:
+                    if line.startswith('Hardware'):
+                        _, value = line.strip().split(':', 1)
+                        value = value.strip()
+                        if value in chips:
+                            if display_result:
+                                print("Found running on the Raspberry Pi")
+                            
+                            return True
+        except Exception:
+            pass
+
+        return False
     
     def run(self):
-        cap = cv2.VideoCapture(self.camera_index)
+        """
+        Primary entry point for VideoThread. Instructions in this method
+        will automatically run as soon as a VideoThread instance is
+        initialized.
+        """
+        is_rpi = self.is_raspberry_pi()
+
+        # capture instance for Picamera2
+        picam2 = None
+
+        # capture instance for OpenCV
+        cap = None
         
+        # import and initialize Picamera2 if VideoThread is
+        # initialized on a Raspberry Pi
+        if is_rpi:
+            from picamera2 import Picamera2
+            
+            picam2 = Picamera2()
+            
+            config = {
+                "format": "RGB888",
+                "size": (640, 480)
+            }
+
+            picam2.configure(picam2.create_preview_configuration(main=config))
+        
+        # initialize classifiers/models
         clf = EnsembleClassifier()
         haar_clf = HaarCascadeClassifier()
+        
+        # Raspberry Pi
+        if is_rpi:
+            picam2.start()
 
-        while True:
-            ret, frame = cap.read()
+            while True:
+                frame = picam2.capture_array()
+                self.detect(clf, haar_clf, frame, frame)
+        # Non-Raspberry-Pi Device (e.g. x86)
+        else:
+            cap = cv2.VideoCapture(self.camera_index)
 
-            if ret and self.target_classifier == "ensemble":
-                clf_output = clf.classify(frame, display=False, as_matlike=True, print_results=False)
-                self.update_frame_signal.emit(clf_output['frame'])
+            while True:
+                ret, frame = cap.read()
+                self.detect(clf, haar_clf, frame, ret)
 
-                if clf_output['full_result'] is not None:
-                    self.update_results_signal.emit(clf_output['full_result'])
-                else:
-                    self.update_results_signal.emit(None)
-            
-            if ret and self.target_classifier == "haar":
-                clf_output = haar_clf.classify(frame, display=False, as_matlike=True)
-                self.update_frame_signal.emit(clf_output['frame'])
+    
+    def detect(self, ensemble_clf, haar_clf, frame, signal):
+        """
+        Method for performing inference using the Ensemble and 
+        Haar Classifiers. This takes a `frame` argument, which 
+        refers to the camera output (i.e. in OpenCV, this will
+        be of MatLike type. The `signal` argument takes any form
+        of data, and it will serve as an indicator that a camera
+        output is being received).
+        """
+        if signal and self.target_classifier == "ensemble":
+            clf_output = ensemble_clf.classify(frame, display=False, as_matlike=True, print_results=False)
+            self.update_frame_signal.emit(clf_output['frame'])
 
-                if clf_output['result'] is not None:
-                    self.update_results_signal.emit(clf_output['result'])
-                else:
-                    self.update_results_signal.emit(None)
+            if clf_output['full_result'] is not None:
+                self.update_results_signal.emit(clf_output['full_result'])
+            else:
+                self.update_results_signal.emit(None)
+
+        if signal and self.target_classifier == "haar":
+            clf_output = haar_clf.classify(frame, display=False, as_matlike=True)
+            self.update_frame_signal.emit(clf_output['frame'])
+
+            if clf_output['result'] is not None:
+                self.update_results_signal.emit(clf_output['result'])
+            else:
+                self.update_results_signal.emit(None)
+
 
 
 class App(QWidget):
@@ -82,6 +165,9 @@ class App(QWidget):
 
 
     def setup_interface(self):
+        """
+        Entry point for initializing the User Interface.
+        """
         main = QVBoxLayout()
         self.setLayout(main)
 
@@ -111,6 +197,9 @@ class App(QWidget):
 
 
     def convert_layout_to_widget(self, layout):
+        """
+        Converts a PyQt Layout to a QWidget instance.
+        """
         widget = QWidget()
         widget.setLayout(layout)
 
@@ -118,6 +207,10 @@ class App(QWidget):
 
 
     def setup_ensemble_results_view(self):
+        """
+        This initializes the view which displays the results
+        returned by the Ensemble Classifier.
+        """
         results_layout = QGridLayout()
 
         results_heading_1 = QLabel("Label")
@@ -140,6 +233,10 @@ class App(QWidget):
     
 
     def setup_haar_results_view(self):
+        """
+        This initializes the view which displays the results
+        returned by the Haar Cascade Classifier.
+        """
         results_layout = QGridLayout()
 
         results_heading_1 = QLabel("Label")
@@ -163,6 +260,10 @@ class App(QWidget):
     
 
     def setup_classifier_switches_view(self):
+        """
+        This initializes Radio buttons for switching between the
+        Haar Cascade Classifier and the Ensemble Classifier.
+        """
         switches_layout = QHBoxLayout()
 
         toggle_ensemble = QRadioButton()
@@ -181,6 +282,9 @@ class App(QWidget):
     
 
     def switch_classifier(self, target_classifier):
+        """
+        Method which updates all properties related to classifier switching.
+        """
         # update local property
         self.active_classifier = target_classifier
 
@@ -195,6 +299,9 @@ class App(QWidget):
 
 
     def create_video_thread(self, camera_index):
+        """
+        Initializes a VideoThread instance.
+        """
         vthread = VideoThread(camera_index)
         vthread.update_frame_signal.connect(self.update_frame)
         vthread.update_results_signal.connect(self.update_results)
@@ -233,11 +340,17 @@ class App(QWidget):
 
 
     def update_active_frame(self, frame):
+        """
+        Updates the Pixmap/Image displayed on the UI.
+        """
         pixmap = self.cv2pixmap(frame)
         self.active_frame.setPixmap(pixmap)
 
 
     def cv2pixmap(self, cv2_frame):
+        """
+        Converts OpenCV/MatLike inputs into Pixmap.
+        """
         frame = cv2.cvtColor(cv2_frame, cv2.COLOR_BGR2RGB)
         height, width, channel = frame.shape
         image_widget = QImage(frame.data, width, height, channel * width, QImage.Format_RGB888)
