@@ -107,7 +107,8 @@ class VideoThread(QThread):
 
             while True:
                 frame = picam2.capture_array()
-                self.detect(clf, haar_clf, frame, frame)
+                ret = frame.any()
+                self.detect(clf, haar_clf, frame, ret)
         # Non-Raspberry-Pi Device (e.g. x86)
         else:
             cap = cv2.VideoCapture(self.camera_index)
