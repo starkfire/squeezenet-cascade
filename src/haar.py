@@ -117,7 +117,8 @@ class HaarCascadeClassifier:
             "bboxes": []
         }
 
-        def update_result(label, bboxes):
+        def update_result(score, label, bboxes):
+            result["score"] = score[0]
             result["label"] = label
             result["bboxes"] = bboxes
 
@@ -126,14 +127,14 @@ class HaarCascadeClassifier:
             # this is to also speed up live mode execution.
             return result
         elif len(bird_scores) > len(cockatiel_scores):
-            update_result("bird", bird_det["bboxes"])
+            update_result(bird_scores, "bird", bird_det["bboxes"])
         elif len(cockatiel_scores) > len(bird_scores):
-            update_result("cockatiel", cockatiel_det["bboxes"])
+            update_result(cockatiel_scores, "cockatiel", cockatiel_det["bboxes"])
         else:
             if self.mean(cockatiel_scores) < self.mean(bird_scores):
-                update_result("cockatiel", cockatiel_det["bboxes"])
+                update_result(cockatiel_scores, "cockatiel", cockatiel_det["bboxes"])
             else:
-                update_result("bird", bird_det["bboxes"])
+                update_result(bird_scores, "bird", bird_det["bboxes"])
 
         return result
 
