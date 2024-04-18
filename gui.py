@@ -240,7 +240,7 @@ class App(QWidget):
 
         results_heading_1 = QLabel("Label")
         results_heading_1.setFont(QFont("Arial", 14, 600))
-        results_heading_2 = QLabel("Probability")
+        results_heading_2 = QLabel("Score")
         results_heading_2.setFont(QFont("Arial", 14, 600))
 
         results_layout.addWidget(results_heading_1, 0, 0)
