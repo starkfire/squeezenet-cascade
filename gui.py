@@ -210,24 +210,26 @@ class App(QWidget):
     
     @pyqtSlot(object)
     def update_results(self, results):
-        if self.active_classifier == "ensemble" and self.vthread.target_classifier == "ensemble":
-            label = results['label'] if results is not None else "No Detections"
-            probability = results['probability'] if results is not None else "0.00"
-            self.ensemble_results_label.setText(f"{label}")
-            self.ensemble_results_prob.setText(f"{probability}")
+        label = "No Detections"
+        probability = "0.00"
 
-        if self.active_classifier == "haar" and self.vthread.target_classifier == "haar":
-            label = "No Detections"
-            probability = "0.00"
+        if results is not None:
+            if self.active_classifier == "ensemble" and self.vthread.target_classifier == "ensemble":
+                if 'label' in results:
+                    label = results['label']
+                if 'probability' in results:
+                    probability = results['probability']
 
-            if 'label' in results:
-                label = results['label']
-
-            if 'score' in results:
-                probability = results['score']
-            
-            self.haar_results_label.setText(f"{label}")
-            self.haar_results_prob.setText(f"{probability}")
+                self.ensemble_results_label.setText(f"{label}")
+                self.ensemble_results_prob.setText(f"{probability}")
+            if self.active_classifier == "haar" and self.vthread.target_classifier == "haar":
+                if 'label' in results:
+                    label = results['label']
+                if 'score' in results:
+                    probability = results['score']
+                
+                self.haar_results_label.setText(f"{label}")
+                self.haar_results_prob.setText(f"{probability}")
 
 
     def update_active_frame(self, frame):
