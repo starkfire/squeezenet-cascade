@@ -62,9 +62,7 @@ class VideoThread(QThread):
                         _, value = line.strip().split(':', 1)
                         value = value.strip()
                         if value in chips:
-                            if display_result:
-                                print("Found running on the Raspberry Pi")
-                            
+                            print("Raspberry Pi chipset detected.")
                             return True
         except Exception:
             pass
