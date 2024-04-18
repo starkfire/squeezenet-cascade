@@ -328,6 +328,7 @@ class App(QWidget):
 
                 self.ensemble_results_label.setText(f"{label}")
                 self.ensemble_results_prob.setText(f"{probability}")
+            
             if self.active_classifier == "haar" and self.vthread.target_classifier == "haar":
                 if 'label' in results:
                     label = results['label']
@@ -336,6 +337,12 @@ class App(QWidget):
                 
                 self.haar_results_label.setText(f"{label}")
                 self.haar_results_prob.setText(f"{probability}")
+        else:
+            self.ensemble_results_label.setText(label)
+            self.haar_results_label.setText(label)
+
+            self.ensemble_results_prob.setText(probability)
+            self.haar_results_prob.setText(probability)
 
 
     def update_active_frame(self, frame):
