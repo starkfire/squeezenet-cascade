@@ -11,11 +11,13 @@ from PyQt5.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QRadioButton,
     QStackedLayout,
     QVBoxLayout,
     QWidget
 )
+import qdarktheme
 import argparse
 import cv2
 import numpy as np
@@ -213,17 +215,17 @@ class App(QWidget):
         results_layout = QGridLayout()
 
         results_heading_1 = QLabel("Label")
-        results_heading_1.setFont(QFont("Arial", 14, 600))
+        results_heading_1.setFont(QFont("Manrope", 14, 600))
         results_heading_2 = QLabel("Probability")
-        results_heading_2.setFont(QFont("Arial", 14, 600))
+        results_heading_2.setFont(QFont("Manrope", 14, 600))
 
         results_layout.addWidget(results_heading_1, 0, 0)
         results_layout.addWidget(results_heading_2, 0, 1)
 
         self.ensemble_results_label = QLabel("No Detections")
-        self.ensemble_results_label.setFont(QFont("Arial", 14, 400))
+        self.ensemble_results_label.setFont(QFont("Manrope", 14, 400))
         self.ensemble_results_prob = QLabel("0.00")
-        self.ensemble_results_prob.setFont(QFont("Arial", 14, 400))
+        self.ensemble_results_prob.setFont(QFont("Manrope", 14, 400))
 
         results_layout.addWidget(self.ensemble_results_label, 1, 0)
         results_layout.addWidget(self.ensemble_results_prob, 1, 1)
@@ -239,18 +241,18 @@ class App(QWidget):
         results_layout = QGridLayout()
 
         results_heading_1 = QLabel("Label")
-        results_heading_1.setFont(QFont("Arial", 14, 600))
+        results_heading_1.setFont(QFont("Manrope", 14, 600))
         results_heading_2 = QLabel("Score")
-        results_heading_2.setFont(QFont("Arial", 14, 600))
+        results_heading_2.setFont(QFont("Manrope", 14, 600))
 
         results_layout.addWidget(results_heading_1, 0, 0)
         results_layout.addWidget(results_heading_2, 0, 1)
 
         self.haar_results_label = QLabel("No Detections")
-        self.haar_results_label.setFont(QFont("Arial", 14, 400))
+        self.haar_results_label.setFont(QFont("Manrope", 14, 400))
         
         self.haar_results_prob = QLabel("0.00")
-        self.haar_results_prob.setFont(QFont("Arial", 14, 400))
+        self.haar_results_prob.setFont(QFont("Manrope", 14, 400))
 
         results_layout.addWidget(self.haar_results_label, 1, 0)
         results_layout.addWidget(self.haar_results_prob, 1, 1)
@@ -265,17 +267,19 @@ class App(QWidget):
         """
         switches_layout = QHBoxLayout()
 
-        toggle_ensemble = QRadioButton()
-        toggle_ensemble.setText("Ensemble Classifier (SqueezeNet + Haar)")
-        toggle_ensemble.setChecked(True)
-        toggle_ensemble.toggled.connect(lambda: self.switch_classifier("ensemble"))
+        self.toggle_ensemble = QPushButton("Ensemble Classifier (SqueezeNet + Haar)")
+        self.toggle_ensemble.setCheckable(True)
+        self.toggle_ensemble.setChecked(True)
+        self.toggle_ensemble.setStyleSheet("font-size: 16px; font-family: 'Manrope'; font-weight: 600;")
+        self.toggle_ensemble.clicked.connect(lambda: self.switch_classifier("ensemble"))
 
-        toggle_haar = QRadioButton()
-        toggle_haar.setText("Haar Cascade Classifier")
-        toggle_haar.toggled.connect(lambda: self.switch_classifier("haar"))
+        self.toggle_haar = QPushButton("Haar Cascade Classifier")
+        self.toggle_haar.setCheckable(True)
+        self.toggle_haar.setStyleSheet("font-size: 16px; font-family: 'Manrope'; font-weight: 600;")
+        self.toggle_haar.clicked.connect(lambda: self.switch_classifier("haar"))
 
-        switches_layout.addWidget(toggle_ensemble)
-        switches_layout.addWidget(toggle_haar)
+        switches_layout.addWidget(self.toggle_ensemble)
+        switches_layout.addWidget(self.toggle_haar)
 
         return switches_layout
     
@@ -293,8 +297,12 @@ class App(QWidget):
         # change view
         if self.active_classifier == "ensemble":
             self.results_stack.setCurrentIndex(0)
+            self.toggle_ensemble.setChecked(True)
+            self.toggle_haar.setChecked(False)
         if self.active_classifier == "haar":
             self.results_stack.setCurrentIndex(1)
+            self.toggle_ensemble.setChecked(False)
+            self.toggle_haar.setChecked(True)
 
 
     def create_video_thread(self, camera_index):
@@ -368,9 +376,11 @@ if __name__ == "__main__":
 
     parser.add_argument("--camera", '-c', nargs='?', type=int, default=0, help="Index of the camera that will be used by cv2.VideoCapture()")
 
+    qdarktheme.enable_hi_dpi()
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
+    qdarktheme.setup_theme("dark")
     a = App(camera_index=args.camera)
     a.show()
     sys.exit(app.exec_())
