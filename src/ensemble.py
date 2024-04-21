@@ -20,7 +20,8 @@ class EnsembleClassifier(HaarCascadeClassifier):
                             "whiteface": (255, 0, 255)}
 
     def parse_model_path(self, model_path):
-        filepath = os.path.join(os.getcwd(), model_path)
+        dirname = os.path.dirname(__file__)
+        filepath = os.path.join(dirname, '..', model_path)
         return filepath
 
     # override
