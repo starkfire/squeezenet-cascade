@@ -91,12 +91,14 @@ class VideoThread(QThread):
         # initialized on a Raspberry Pi
         if is_rpi:
             from picamera2 import Picamera2
+            from libcamera import Transform
             
             picam2 = Picamera2()
             
             config = {
                 "format": "RGB888",
-                "size": (640, 480)
+                "size": (640, 480),
+                "transform": Transform(hflip=1)
             }
 
             picam2.configure(picam2.create_preview_configuration(main=config))
