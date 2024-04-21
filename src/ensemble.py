@@ -1,15 +1,16 @@
 from .haar import HaarCascadeClassifier
 from .squeezenet import SqueezeNet
 import cv2
+import os
 
-DEFAULT_SQUEEZENET_CLF_PATH = "./pretrained/model_10-epochs_1713362879.588241.pt"
+DEFAULT_SQUEEZENET_CLF_PATH = "pretrained/model_10-epochs_1713362879.588241.pt"
 
 class EnsembleClassifier(HaarCascadeClassifier):
 
     def __init__(self, squeezenet_clf_path=DEFAULT_SQUEEZENET_CLF_PATH):
         super().__init__()
         self.squeezenet_clf = SqueezeNet()
-        self.squeezenet_clf.load_custom_model(squeezenet_clf_path)
+        self.squeezenet_clf.load_custom_model(self.parse_model_path(squeezenet_clf_path))
 
         self.bbox_colors = {"bird": (0, 255, 0),
                             "cinnamon": (255, 0, 0),
@@ -17,6 +18,10 @@ class EnsembleClassifier(HaarCascadeClassifier):
                             "pearl": (0, 255, 255),
                             "pied": (255, 255, 0),
                             "whiteface": (255, 0, 255)}
+
+    def parse_model_path(self, model_path):
+        filepath = os.path.join(os.getcwd(), model_path)
+        return filepath
 
     # override
     def classify(self, image, display=True, as_matlike=False, print_results=True):
