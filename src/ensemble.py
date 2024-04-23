@@ -3,7 +3,7 @@ from .squeezenet import SqueezeNet
 import cv2
 import os
 
-DEFAULT_SQUEEZENET_CLF_PATH = "pretrained/model_10-epochs_1713362879.588241.pt"
+DEFAULT_SQUEEZENET_CLF_PATH = "pretrained/model_15-epochs_1713461405.2524464.pt"
 
 class EnsembleClassifier(HaarCascadeClassifier):
 
