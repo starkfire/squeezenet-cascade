@@ -26,6 +26,7 @@ import numpy as np
 import sys
 import os
 import io
+import time
 
 # classifier classes
 from src.ensemble import EnsembleClassifier
@@ -34,11 +35,13 @@ from src.haar import HaarCascadeClassifier
 class VideoThread(QThread):
     update_frame_signal = pyqtSignal(np.ndarray)
     update_results_signal = pyqtSignal(object)
+    done_averaging = pyqtSignal(bool)
 
-    def __init__(self, camera_index=0, target_classifier="ensemble"):
+    def __init__(self, camera_index=0, target_classifier="ensemble", averaging_mode=False):
         super().__init__()
         self.camera_index = camera_index
         self.target_classifier = target_classifier
+        self.averaging_mode = averaging_mode
 
     
     def switch_classifier(self, target_classifier):
@@ -46,6 +49,13 @@ class VideoThread(QThread):
         Setter for the `target_classifier` property.
         """
         self.target_classifier = target_classifier
+
+
+    def toggle_averaging(self, value: bool):
+        """
+        Setter for the `averaging_mode` property.
+        """
+        self.averaging_mode = value
 
 
     def is_raspberry_pi(self):
@@ -120,8 +130,66 @@ class VideoThread(QThread):
             cap = cv2.VideoCapture(self.camera_index)
 
             while True:
-                ret, frame = cap.read()
-                self.detect(clf, haar_clf, frame, ret)
+                if self.averaging_mode:
+                    labels = []
+                    probs = []
+                    ctr = 0
+
+                    while ctr < 40:
+                        ret, frame = cap.read()
+
+                        results = self.detect(clf, haar_clf, frame, ret)
+
+                        if results is not None:
+                            print(f"Frame: {ctr + 1}, Label: {results['label']}, Prob: {results['probability']}")
+                            labels.append(results['label'])
+                            probs.append(results['probability'].item())
+                        else:
+                            labels.append(None)
+                            probs.append(0)
+                        
+                        ctr += 1
+
+                        if not self.averaging_mode:
+                            self.done_averaging.emit(True)
+                            break
+
+                    self.averaging_mode = False
+                    self.done_averaging.emit(True)
+
+                    overalls = self.get_overalls(labels, probs)
+                    filepath = os.path.join(os.path.dirname(__file__), "results", f"averages_{time.time()}.txt")
+
+                    with open(filepath, 'a') as f:
+                        for idx, label in enumerate(labels):
+                            f.write(f"Frame {idx + 1}: {label} ({probs[idx]})\n")
+
+                        f.write("\nOVERALLS:\n")
+                        for label, prob in overalls.items():
+                            f.write(f"{label}: {prob}\n")
+
+                        f.close()
+
+                    print(f"Results written to {filepath}")
+                else:
+                    ret, frame = cap.read()
+                    self.detect(clf, haar_clf, frame, ret)
+
+
+    def get_overalls(self, labels, probabilities):
+        results = {}
+        labels_set = {label for label in labels}
+
+        for label in labels_set:
+            probs = []
+
+            for idx, x in enumerate(probabilities):
+                if labels[idx] == label:
+                    probs.append(x)
+
+            results[label] = sum(probs) / 40
+
+        return results
 
     
     def detect(self, ensemble_clf, haar_clf, frame, signal):
@@ -142,6 +210,8 @@ class VideoThread(QThread):
             else:
                 self.update_results_signal.emit(None)
 
+            return clf_output['full_result']
+
         if signal and self.target_classifier == "haar":
             clf_output = haar_clf.classify(frame, display=False, as_matlike=True)
             self.update_frame_signal.emit(clf_output['frame'])
@@ -151,6 +221,7 @@ class VideoThread(QThread):
             else:
                 self.update_results_signal.emit(None)
 
+            return clf_output['result']
 
 
 class App(QWidget):
@@ -161,6 +232,7 @@ class App(QWidget):
         self.camera_index = camera_index
         self.current_frame = None
         self.active_classifier = "ensemble"
+        self.averaging_mode = False
         
         self.setWindowTitle("Cockatiel Species Classifier")
         self.setup_interface()
@@ -216,6 +288,7 @@ class App(QWidget):
         This initializes the view which displays the results
         returned by the Ensemble Classifier.
         """
+        view_layout = QVBoxLayout()
         results_layout = QGridLayout()
 
         results_heading_1 = QLabel("Label")
@@ -234,7 +307,23 @@ class App(QWidget):
         results_layout.addWidget(self.ensemble_results_label, 1, 0)
         results_layout.addWidget(self.ensemble_results_prob, 1, 1)
 
-        return results_layout
+        view_layout.addLayout(results_layout)
+
+        self.toggle_averaging_btn = QPushButton("Run in Averaging Mode (40 frames)")
+        self.toggle_averaging_btn.setCheckable(True)
+        self.toggle_averaging_btn.setChecked(False)
+        self.toggle_averaging_btn.setStyleSheet("font-size: 16px; font-family: 'Manrope'; font-weight: 600;")
+        self.toggle_averaging_btn.clicked.connect(self.toggle_averaging)
+        
+        view_layout.addWidget(self.toggle_averaging_btn)
+
+        return view_layout
+
+
+    def toggle_averaging(self):
+        self.averaging_mode = True if self.averaging_mode is False else False
+        self.toggle_averaging_btn.setChecked(True)
+        self.vthread.toggle_averaging(self.averaging_mode)
     
 
     def setup_haar_results_view(self):
@@ -316,6 +405,7 @@ class App(QWidget):
         vthread = VideoThread(camera_index)
         vthread.update_frame_signal.connect(self.update_frame)
         vthread.update_results_signal.connect(self.update_results)
+        vthread.done_averaging.connect(self.done_averaging)
         
         return vthread
 
@@ -324,6 +414,13 @@ class App(QWidget):
     def update_frame(self, frame):
         self.current_frame = frame
         self.update_active_frame(frame)
+
+
+    @pyqtSlot(bool)
+    def done_averaging(self, status):
+        if status:
+            self.averaging_mode = False
+            self.toggle_averaging_btn.setChecked(False)
 
     
     @pyqtSlot(object)
