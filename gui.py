@@ -125,7 +125,7 @@ class VideoThread(QThread):
 
             while True:
                 if self.averaging_mode:
-                    self.run_averaging_mode(frame, is_rpi)
+                    self.run_averaging_mode(picam2, is_rpi)
                 else:
                     frame = picam2.capture_array()
                     ret = frame.any()
@@ -143,7 +143,7 @@ class VideoThread(QThread):
                     self.detect(self.clf, self.haar_clf, frame, ret)
 
 
-    def run_averaging_mode(self, cap: cv2.VideoCapture | Picamera2, is_rpi: bool):
+    def run_averaging_mode(self, cap, is_rpi: bool):
         labels = []
         probs = []
         ctr = 0
