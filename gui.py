@@ -43,6 +43,9 @@ class VideoThread(QThread):
         self.target_classifier = target_classifier
         self.averaging_mode = averaging_mode
 
+        self.clf = None
+        self.haar_clf = None
+
     
     def switch_classifier(self, target_classifier):
         """
@@ -107,73 +110,84 @@ class VideoThread(QThread):
             
             config = {
                 "format": "RGB888",
-                "size": (640, 480),
-                "transform": Transform(hflip=1)
+                "size": (640, 480)
             }
 
             picam2.configure(picam2.create_preview_configuration(main=config))
         
         # initialize classifiers/models
-        clf = EnsembleClassifier()
-        haar_clf = HaarCascadeClassifier()
+        self.clf = EnsembleClassifier()
+        self.haar_clf = HaarCascadeClassifier()
         
         # Raspberry Pi
         if is_rpi:
             picam2.start()
 
             while True:
-                frame = picam2.capture_array()
-                ret = frame.any()
-                self.detect(clf, haar_clf, frame, ret)
+                if self.averaging_mode:
+                    self.run_averaging_mode(frame, is_rpi)
+                else:
+                    frame = picam2.capture_array()
+                    ret = frame.any()
+
+                    self.detect(self.clf, self.haar_clf, frame, ret)
         # Non-Raspberry-Pi Device (e.g. x86)
         else:
             cap = cv2.VideoCapture(self.camera_index)
 
             while True:
                 if self.averaging_mode:
-                    labels = []
-                    probs = []
-                    ctr = 0
-
-                    while ctr < 40:
-                        ret, frame = cap.read()
-
-                        results = self.detect(clf, haar_clf, frame, ret)
-
-                        if results is not None:
-                            print(f"Frame: {ctr + 1}, Label: {results['label']}, Prob: {results['probability']}")
-                            labels.append(results['label'])
-                            probs.append(results['probability'].item())
-                        else:
-                            labels.append(None)
-                            probs.append(0)
-                        
-                        ctr += 1
-
-                        if not self.averaging_mode:
-                            self.done_averaging.emit(True)
-                            break
-
-                    self.averaging_mode = False
-                    self.done_averaging.emit(True)
-
-                    overalls = self.get_overalls(labels, probs)
-                    filepath = os.path.join(os.path.dirname(__file__), "results", f"averages_{time.time()}.txt")
-
-                    with open(filepath, 'a') as f:
-                        for idx, label in enumerate(labels):
-                            f.write(f"Frame {idx + 1}: {label} ({probs[idx]})\n")
-
-                        f.write("\nOVERALLS:\n")
-                        for label, prob in overalls.items():
-                            f.write(f"{label}: {prob}\n")
-
-                        f.close()
-
-                    print(f"Results written to {filepath}")
+                    self.run_averaging_mode(cap, is_rpi)
                 else:
                     ret, frame = cap.read()
-                    self.detect(clf, haar_clf, frame, ret)
+                    self.detect(self.clf, self.haar_clf, frame, ret)
+
+
+    def run_averaging_mode(self, cap: cv2.VideoCapture | Picamera2, is_rpi: bool):
+        labels = []
+        probs = []
+        ctr = 0
+
+        while ctr < 40:
+            if is_rpi:
+                frame = cap.capture_array()
+                ret = frame.any()
+            else:
+                ret, frame = cap.read()
+
+            results = self.detect(self.clf, self.haar_clf, frame, ret)
+
+            if results is not None:
+                print(f"Frame: {ctr + 1}, Label: {results['label']}, Prob: {results['probability']}")
+                labels.append(results['label'])
+                probs.append(results['probability'].item())
+            else:
+                labels.append(None)
+                probs.append(0)
+
+            ctr += 1
+
+            if not self.averaging_mode:
+                self.done_averaging.emit(True)
+                break
+
+        self.averaging_mode = False
+        self.done_averaging.emit(True)
+
+        overalls = self.get_overalls(labels, probs)
+        filepath = os.path.join(os.path.dirname(__file__), "results", f"averages_{time.time()}.txt")
+
+        with open(filepath, 'a') as f:
+            for idx, label in enumerate(labels):
+                f.write(f"Frame {idx + 1}: {label} ({probs[idx]})\n")
+
+            f.write("\nOVERALLS:\n")
+            for label, prob in overalls.items():
+                f.write(f"{label}: {prob}\n")
+
+            f.close()
+
+        print(f"Results written to {filepath}")
 
 
     def get_overalls(self, labels, probabilities):
