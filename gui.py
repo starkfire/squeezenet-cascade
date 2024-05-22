@@ -17,7 +17,8 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QStackedLayout,
     QVBoxLayout,
-    QWidget
+    QWidget,
+    QMessageBox
 )
 import qdarktheme
 import argparse
@@ -36,6 +37,7 @@ class VideoThread(QThread):
     update_frame_signal = pyqtSignal(np.ndarray)
     update_results_signal = pyqtSignal(object)
     done_averaging = pyqtSignal(bool)
+    averaging_results = pyqtSignal(dict)
 
     def __init__(self, camera_index=0, target_classifier="ensemble", averaging_mode=False):
         super().__init__()
@@ -188,6 +190,9 @@ class VideoThread(QThread):
             f.close()
 
         print(f"Results written to {filepath}")
+
+        highest_scoring = max(overalls, key=overalls.get)
+        self.averaging_results.emit({ f"{highest_scoring}": overalls[highest_scoring] })
 
 
     def get_overalls(self, labels, probabilities):
@@ -420,6 +425,7 @@ class App(QWidget):
         vthread.update_frame_signal.connect(self.update_frame)
         vthread.update_results_signal.connect(self.update_results)
         vthread.done_averaging.connect(self.done_averaging)
+        vthread.averaging_results.connect(self.display_averaging_results)
         
         return vthread
 
@@ -436,6 +442,15 @@ class App(QWidget):
             self.averaging_mode = False
             self.toggle_averaging_btn.setChecked(False)
 
+    
+    @pyqtSlot(dict)
+    def display_averaging_results(self, results):
+        if results:
+            result_class = list(results.keys())[0]
+            self.alert = QMessageBox()
+            self.alert.setText(f"HIGHEST-SCORING CLASS: {result_class} ({results[result_class]})")
+            self.alert.exec()
+    
     
     @pyqtSlot(object)
     def update_results(self, results):
