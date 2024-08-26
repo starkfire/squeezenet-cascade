@@ -70,11 +70,12 @@ class HaarCascadeClassifier:
 
         for (x, y, w, h) in outputs:
             confidence = len(outputs) / (w * h)
-            # threshold = self.cockatiel_threshold if label.lower() == "cockatiel" else self.bird_threshold
-            
-            confidence_scores.append(confidence)
-            bbox_regions.append((x, y, w, h))
-            labels.append(label.lower())
+            threshold = self.cockatiel_threshold if label.lower() == "cockatiel" else self.bird_threshold
+
+            if confidence >= threshold:
+                confidence_scores.append(confidence)
+                bbox_regions.append((x, y, w, h))
+                labels.append(label.lower())
 
         return {
             "scores": confidence_scores,
