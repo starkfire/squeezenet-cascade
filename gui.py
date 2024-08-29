@@ -115,7 +115,7 @@ class VideoThread(QThread):
                 "size": (640, 480)
             }
 
-            picam2.configure(picam2.create_preview_configuration(main=config))
+            picam2.configure(picam2.create_preview_configuration(main=config, transform=Transform(vflip=1, hflip=1)))
         
         # initialize classifiers/models
         self.clf = EnsembleClassifier()
@@ -150,7 +150,7 @@ class VideoThread(QThread):
         probs = []
         ctr = 0
 
-        while ctr < 40:
+        while ctr < 60:
             if is_rpi:
                 frame = cap.capture_array()
                 ret = frame.any()
@@ -206,7 +206,7 @@ class VideoThread(QThread):
                 if labels[idx] == label:
                     probs.append(x)
 
-            results[label] = sum(probs) / 40
+            results[label] = sum(probs) / 60
 
         return results
 
@@ -318,7 +318,7 @@ class App(QWidget):
         results_layout.addWidget(results_heading_1, 0, 0)
         results_layout.addWidget(results_heading_2, 0, 1)
 
-        self.ensemble_results_label = QLabel("No Detections")
+        self.ensemble_results_label = QLabel("Unidentified Cockatiel Mutation")
         self.ensemble_results_label.setFont(QFont("Manrope", 14, 400))
         self.ensemble_results_prob = QLabel("0.00")
         self.ensemble_results_prob.setFont(QFont("Manrope", 14, 400))
@@ -328,7 +328,7 @@ class App(QWidget):
 
         view_layout.addLayout(results_layout)
 
-        self.toggle_averaging_btn = QPushButton("Run in Averaging Mode (40 frames)")
+        self.toggle_averaging_btn = QPushButton("Cockatiel Mutation Classifier Averaging Mode (60 frames)")
         self.toggle_averaging_btn.setCheckable(True)
         self.toggle_averaging_btn.setChecked(False)
         self.toggle_averaging_btn.setStyleSheet("font-size: 16px; font-family: 'Manrope'; font-weight: 600;")
@@ -360,7 +360,7 @@ class App(QWidget):
         results_layout.addWidget(results_heading_1, 0, 0)
         results_layout.addWidget(results_heading_2, 0, 1)
 
-        self.haar_results_label = QLabel("No Detections")
+        self.haar_results_label = QLabel("Unidentified Bird")
         self.haar_results_label.setFont(QFont("Manrope", 14, 400))
         
         self.haar_results_prob = QLabel("0.00")
@@ -448,7 +448,7 @@ class App(QWidget):
         if results:
             result_class = list(results.keys())[0]
             self.alert = QMessageBox()
-            self.alert.setText(f"HIGHEST-SCORING CLASS: {result_class} ({results[result_class]})")
+            self.alert.setText(f"The cockatiel mutation is a {result_class} cockatiel with a probability of ({results[result_class]:.2%})")
             self.alert.exec()
     
     

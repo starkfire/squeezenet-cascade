@@ -2,7 +2,8 @@ import cv2
 import os
 
 DEFAULT_BIRD_CLF_PATH = "../pretrained/bird15stages.xml"
-DEFAULT_COCKATIEL_CLF_PATH = "../pretrained/cockatiel15stages.xml"
+# DEFAULT_COCKATIEL_CLF_PATH = "../pretrained/cockatiel15stages.xml"
+DEFAULT_COCKATIEL_CLF_PATH = "../pretrained/cockatiel12stages.xml"
 
 class HaarCascadeClassifier:
 
@@ -13,19 +14,28 @@ class HaarCascadeClassifier:
         # threshold
         # self.bird_threshold = 1.351643598615917e-05
         # self.cockatiel_threshold = 1.3819598955238318e-05
+        # self.bird_threshold = 6.54643598615917e-05
+        # self.cockatiel_threshold = 1.21448955238318e-05
       
         # threshold (optimizer)
-        self.bird_threshold = 3.0046271257736914e-05
-        self.cockatiel_threshold = 1.814486863115111e-05
+        # self.bird_threshold = 3.0046271257736914e-05
+        # self.cockatiel_threshold = 1.814486863115111e-05
+        self.bird_threshold = 1.3e-05
+        self.cockatiel_threshold = 1.25e-05
 
-        self.roi_x = 100
-        self.roi_y = 100
-        self.roi_w = 500
+        # self.roi_x = 100
+        # self.roi_y = 100
+        # self.roi_w = 500
+        self.roi_x = 0
+        self.roi_y = 0
+        self.roi_w = 600
         self.roi_h = 500
 
         # detectMultiScale parameters
-        self.scaleFactor = 1.124
-        self.minNeighbors = 10
+        # self.scaleFactor = 1.124
+        # self.minNeighbors = 10
+        self.scaleFactor = 1.095
+        self.minNeighbors = 17
         self.minSize = (224, 224)
 
         # bounding box parameters
