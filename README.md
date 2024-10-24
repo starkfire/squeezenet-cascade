@@ -110,4 +110,16 @@ python main.py optimize -d dataset/cockatiel
 
 Note that this wouldn't affect the classifier's existing state, unless it is modified to use the values.
 
+## Troubleshooting
 
+In some cases, `CascadeClassifier()`'s `detectMultiScale()` may not work properly in some Linux environments, causing the following issue when running `gui.py`:
+
+```
+free(): invalid pointer
+```
+
+By default, `detectMultiScale()` uses OpenCL, and a broken OpenCL driver can cause the issue. In such cases, you can disable the OpenCL runtime and force OpenCV to use the CPU:
+
+```sh
+OPENCV_OPENCL_RUNTIME=disabled python gui.py
+```
