@@ -123,3 +123,11 @@ By default, `detectMultiScale()` uses OpenCL, and a broken OpenCL driver can cau
 ```sh
 OPENCV_OPENCL_RUNTIME=disabled python gui.py
 ```
+
+You can confirm that a broken OpenCL driver causes the issue by running:
+
+```sh
+clinfo
+```
+
+If this is the case, you will need to manually reinstall drivers yourself.
