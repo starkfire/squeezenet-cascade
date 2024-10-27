@@ -164,3 +164,6 @@ dataset/bird/
 dataset/cockatiel/
 dataset/
 results/
+
+pretrained/cockatiel*
+pretrained/bird*
