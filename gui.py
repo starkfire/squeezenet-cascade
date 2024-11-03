@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
     QFileDialog,
     QGridLayout,
     QHBoxLayout,
+    QComboBox,
     QLineEdit,
     QLabel,
     QPushButton,
@@ -47,11 +48,17 @@ class YOLOv8Thread(QObject):
     annotated = pyqtSignal(np.ndarray)
     done = pyqtSignal()
 
-    def __init__(self, image_path, model_path=YOLOV8_WEIGHTS_PATH, parent=None):
+    def __init__(self, 
+                 image_path, 
+                 model_path=YOLOV8_WEIGHTS_PATH, 
+                 parent=None,
+                 color_retrieval_strategy="canny"
+    ):
         QThread.__init__(self, parent)
         self.image_path = image_path
         self.model_path = model_path
         self.model = YOLO(self.model_path)
+        self.color_retrieval_strategy = color_retrieval_strategy
 
     
     def run(self):
@@ -64,7 +71,7 @@ class YOLOv8Thread(QObject):
             for result in results[0].boxes:
                 x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
                 cropped = image[y1:y2, x1:x2]
-                colors = retrieve_dominant_colors(cropped)
+                colors = retrieve_dominant_colors(cropped, self.color_retrieval_strategy)
                 dominant_colors.append(colors)
         
         self.result.emit(dominant_colors)
@@ -291,6 +298,7 @@ class App(QWidget):
         self.camera_index = camera_index
         self.current_frame = None
         self.active_classifier = "ensemble"
+        self.color_retrieval_strategy = "canny"
         self.averaging_mode = False
         
         self.setWindowTitle("Cockatiel Species Classifier")
@@ -345,10 +353,24 @@ class App(QWidget):
         return tab
 
 
+    def on_select_strategy_change(self):
+        selected_idx = self.select_strategy.currentIndex()
+
+        if selected_idx == 0:
+            self.color_retrieval_strategy = "canny"
+        if selected_idx == 1:
+            self.color_retrieval_strategy = "lab"
+        if selected_idx == 2:
+            self.color_retrieval_strategy = "slic"
+
+        return
+
+
     def color_density_analyzer_ui(self):
         tab = QWidget()
         vbox = QVBoxLayout()
         io_row = QHBoxLayout()
+        strategy_row = QVBoxLayout()
         input_row = QHBoxLayout()
 
         # input image preview
@@ -360,6 +382,18 @@ class App(QWidget):
 
         io_row.addWidget(self.preview_box, alignment=Qt.AlignCenter)
         io_row.addLayout(self.output_box)
+
+        # color retrieval strategy selection
+        select_strategy = QComboBox()
+        select_strategy.addItems([
+            "Canny Edge Detector + KNN + Gaussian Blur",
+            "CLIELAB Color Space",
+            "SLIC (Superpixels)"
+        ])
+        select_strategy.activated.connect(self.on_select_strategy_change)
+        self.select_strategy = select_strategy
+
+        strategy_row.addWidget(self.select_strategy)
 
         # filepath input element
         self.filepath_input = QLineEdit()
@@ -373,6 +407,7 @@ class App(QWidget):
         input_row.addWidget(input_btn)
         
         vbox.addLayout(io_row)
+        vbox.addLayout(strategy_row)
         vbox.addLayout(input_row)
 
         tab.setLayout(vbox)
@@ -518,12 +553,12 @@ class App(QWidget):
         return vthread
 
 
-    def run_yolov8(self, input_image):
+    def run_yolov8(self, input_image, color_retrieval_strategy):
         """
         Spins up a thread for performing object detection with YOLOv8
         """
         self.yolo_thread = QThread()
-        self.yolo = YOLOv8Thread(input_image)
+        self.yolo = YOLOv8Thread(input_image, color_retrieval_strategy=color_retrieval_strategy)
 
         results = {
             "results": None,
@@ -653,7 +688,7 @@ class App(QWidget):
 
         self.preview_box.setText("Running YOLOv8...")
         self.show()
-        self.run_yolov8(image_path)
+        self.run_yolov8(image_path, self.color_retrieval_strategy)
 
 
     def clear_layout(self, layout):
