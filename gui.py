@@ -10,16 +10,19 @@ from PyQt5.QtCore import (
 from PyQt5.QtGui import QPixmap, QImage, QFont
 from PyQt5.QtWidgets import (
     QApplication,
+    QFileDialog,
     QGridLayout,
     QHBoxLayout,
+    QLineEdit,
     QLabel,
     QPushButton,
-    QRadioButton,
     QStackedLayout,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
     QMessageBox
 )
+from pathlib import Path
 import qdarktheme
 import argparse
 import cv2
@@ -32,6 +35,40 @@ import time
 # classifier classes
 from src.ensemble import EnsembleClassifier
 from src.haar import HaarCascadeClassifier
+from src.colors import retrieve_dominant_colors, get_color_luminance
+from ultralytics import YOLO
+
+YOLOV8_WEIGHTS_PATH = "./pretrained/best.pt"
+
+
+class YOLOv8Thread(QObject):
+    result = pyqtSignal(object)
+    annotated = pyqtSignal(np.ndarray)
+    done = pyqtSignal()
+
+    def __init__(self, image_path, model_path=YOLOV8_WEIGHTS_PATH, parent=None):
+        QThread.__init__(self, parent)
+        self.image_path = image_path
+        self.model_path = model_path
+        self.model = YOLO(self.model_path)
+
+    
+    def run(self):
+        image = cv2.imread(self.image_path)
+        results = self.model.predict(image)[0]
+        annotated = results.plot()
+        dominant_colors = []
+
+        for result in results[0].boxes:
+            x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
+            cropped = image[y1:y2, x1:x2]
+            colors = retrieve_dominant_colors(cropped)
+            dominant_colors.append(colors)
+        
+        self.result.emit(dominant_colors)
+        self.annotated.emit(annotated)
+        self.done.emit()
+
 
 class VideoThread(QThread):
     update_frame_signal = pyqtSignal(np.ndarray)
@@ -101,10 +138,13 @@ class VideoThread(QThread):
 
         # capture instance for OpenCV
         cap = None
+
+        # initialize classifiers/models
+        self.clf = EnsembleClassifier()
+        self.haar_clf = HaarCascadeClassifier()
         
-        # import and initialize Picamera2 if VideoThread is
-        # initialized on a Raspberry Pi
         if is_rpi:
+            # for RPi, use Picamera2 for camera inputs instead of OpenCV
             from picamera2 import Picamera2
             from libcamera import Transform
             
@@ -116,13 +156,6 @@ class VideoThread(QThread):
             }
 
             picam2.configure(picam2.create_preview_configuration(main=config, transform=Transform(vflip=1, hflip=1)))
-        
-        # initialize classifiers/models
-        self.clf = EnsembleClassifier()
-        self.haar_clf = HaarCascadeClassifier()
-        
-        # Raspberry Pi
-        if is_rpi:
             picam2.start()
 
             while True:
@@ -133,16 +166,21 @@ class VideoThread(QThread):
                     ret = frame.any()
 
                     self.detect(self.clf, self.haar_clf, frame, ret)
-        # Non-Raspberry-Pi Device (e.g. x86)
         else:
+            # for x86 and non-RPi devices
             cap = cv2.VideoCapture(self.camera_index)
 
-            while True:
-                if self.averaging_mode:
-                    self.run_averaging_mode(cap, is_rpi)
-                else:
-                    ret, frame = cap.read()
-                    self.detect(self.clf, self.haar_clf, frame, ret)
+            try:
+                while True:
+                    if self.averaging_mode:
+                        self.run_averaging_mode(cap, is_rpi)
+                    else:
+                        ret, frame = cap.read()
+
+                        if ret:
+                            self.detect(self.clf, self.haar_clf, frame, ret)
+            finally:
+                cap.release()
 
 
     def run_averaging_mode(self, cap, is_rpi: bool):
@@ -267,15 +305,27 @@ class App(QWidget):
         main = QVBoxLayout()
         self.setLayout(main)
 
+        tabs = QTabWidget()
+        tabs.addTab(self.detector_ui(), "Detector")
+        tabs.addTab(self.color_density_analyzer_ui(), "Color Density")
+        main.addWidget(tabs)
+
+        self.show()
+
+
+    def detector_ui(self):
+        tab = QWidget()
+        layout = QVBoxLayout()
+
         # camera view
         self.active_frame = QLabel(self)
         self.active_frame.resize(256, 256)
-        main.addWidget(self.active_frame, alignment=Qt.AlignCenter)
+        layout.addWidget(self.active_frame, alignment=Qt.AlignCenter)
 
         # classifier switches
         switches_layout = self.setup_classifier_switches_view()
-        main.addLayout(switches_layout)
-        
+        layout.addLayout(switches_layout)
+
         # results view
         self.results_stack = QStackedLayout()
 
@@ -287,9 +337,45 @@ class App(QWidget):
         haar_results_widget = self.convert_layout_to_widget(haar_results_layout)
         self.results_stack.addWidget(haar_results_widget)
 
-        main.addLayout(self.results_stack)
+        layout.addLayout(self.results_stack)
+        tab.setLayout(layout)
 
-        self.show()
+        return tab
+
+
+    def color_density_analyzer_ui(self):
+        tab = QWidget()
+        vbox = QVBoxLayout()
+        io_row = QHBoxLayout()
+        input_row = QHBoxLayout()
+
+        # input image preview
+        self.preview_box = QLabel(self)
+        self.preview_box.resize(256, 256)
+
+        # output results box
+        self.output_box = QVBoxLayout()
+
+        io_row.addWidget(self.preview_box, alignment=Qt.AlignCenter)
+        io_row.addLayout(self.output_box)
+
+        # filepath input element
+        self.filepath_input = QLineEdit()
+        self.filepath_input.setReadOnly(True)
+        
+        # select file button
+        input_btn = QPushButton("Select an Image")
+        input_btn.clicked.connect(lambda: self.select_file())
+
+        input_row.addWidget(self.filepath_input)
+        input_row.addWidget(input_btn)
+        
+        vbox.addLayout(io_row)
+        vbox.addLayout(input_row)
+
+        tab.setLayout(vbox)
+
+        return tab
 
 
     def convert_layout_to_widget(self, layout):
@@ -429,6 +515,40 @@ class App(QWidget):
         
         return vthread
 
+
+    def run_yolov8(self, input_image):
+        """
+        Spins up a thread for performing object detection with YOLOv8
+        """
+        self.yolo_thread = QThread()
+        self.yolo = YOLOv8Thread(input_image)
+
+        results = {
+            "results": None,
+            "image_path": None,
+            "annotated": None
+        }
+
+        def update_results(value):
+            nonlocal results
+            results["results"] = value
+            results["image_path"] = input_image
+
+        def attach_annotated(value):
+            nonlocal results
+            results["annotated"] = value
+
+        self.yolo_thread.started.connect(self.yolo.run)
+        self.yolo_thread.finished.connect(self.yolo_thread.deleteLater)
+        
+        self.yolo.result.connect(update_results)
+        self.yolo.annotated.connect(attach_annotated)
+        self.yolo.done.connect(self.yolo_thread.quit)
+        self.yolo.done.connect(self.yolo.deleteLater)
+        
+        self.yolo_thread.start()
+        self.yolo_thread.finished.connect(lambda: self.pass_to_output_box(results))
+
     
     @pyqtSlot(np.ndarray)
     def update_frame(self, frame):
@@ -481,6 +601,71 @@ class App(QWidget):
 
             self.ensemble_results_prob.setText(probability)
             self.haar_results_prob.setText(probability)
+
+
+    def select_file(self):
+        """
+        File selection method
+        """
+        filename, _ = QFileDialog.getOpenFileName(self, "Select Image", os.getcwd(), "Images (*.jpg *.jpeg *.png)")
+
+        if not filename:
+            return
+
+        # parse filepath
+        image_path = Path(filename)
+
+        # set filepath indicator value
+        self.filepath_input.setText(str(image_path))
+
+        if not image_path or image_path is None:
+            self.alert = QMessageBox()
+            self.alert.setText("Please provide a valid input image")
+            self.alert.exec()
+            return
+
+        # clear output box
+        self.clear_layout(self.output_box)
+
+        self.preview_box.setText("Running YOLOv8...")
+        self.show()
+        self.run_yolov8(image_path)
+
+
+    def clear_layout(self, layout):
+        """
+        Method for clearing a layout of widgets
+        """
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+
+
+    def pass_to_output_box(self, results):
+        """
+        Display color analyzer results to output box
+        """
+        if results["annotated"] is not None:
+            pixmap = self.cv2pixmap(results["annotated"]).scaledToHeight(500)
+            self.preview_box.setPixmap(pixmap)
+
+        if results["results"] is not None and len(results["results"]) > 0:
+            for color in results["results"][0]:
+                hex_code, percentage = color
+                color_block = QLabel()
+
+                # adjust text color according to the detected color's luminance
+                luminance = get_color_luminance(hex_code)
+                text_color = "black" if luminance > 186 else "white"
+
+                color_block.setStyleSheet(f"background-color: {hex_code}; width: 50px; height: 50px; font-weight: 600; font-size: 14px; color: {text_color}")
+                color_block.setText("{} ({:.2f}%)".format(hex_code, percentage))
+                color_block.setAlignment(Qt.AlignCenter)
+                self.output_box.addWidget(color_block)
 
 
     def update_active_frame(self, frame):
