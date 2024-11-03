@@ -620,21 +620,34 @@ class App(QWidget):
         # set filepath indicator value
         self.filepath_input.setText(str(image_path))
 
+        is_valid = True
+
+        def show_message_box(text):
+            self.alert = QMessageBox()
+            self.alert.setText(text)
+            self.alert.exec()
+
         if not image_path or image_path is None:
-            self.alert = QMessageBox()
-            self.alert.setText("Please provide a valid input image")
-            self.alert.exec()
+            is_valid = False
+            show_message_box("Please provide a valid input image")
             return
 
-        img_test = Image.open(image_path)
-        img_arr = np.array(img_test)
+        try:
+            img_test = Image.open(image_path)
+            img_arr = np.array(img_test)
 
-        if len(img_arr.shape) != 3:
-            self.alert = QMessageBox()
-            self.alert.setText("Input image is invalid or corrupted")
-            self.alert.exec()
+            if len(img_arr.shape) != 3:
+                is_valid = False
+                show_message_box("Input image is invalid or corrupted")
+                return
+        except:
+            is_valid = False
+            show_message_box("Input image is invalid or corrupted")
             return
 
+        if not is_valid:
+            return
+        
         # clear output box
         self.clear_layout(self.output_box)
 
