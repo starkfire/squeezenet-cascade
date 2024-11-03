@@ -31,6 +31,7 @@ import sys
 import os
 import io
 import time
+from PIL import Image
 
 # classifier classes
 from src.ensemble import EnsembleClassifier
@@ -59,11 +60,12 @@ class YOLOv8Thread(QObject):
         annotated = results.plot()
         dominant_colors = []
 
-        for result in results[0].boxes:
-            x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
-            cropped = image[y1:y2, x1:x2]
-            colors = retrieve_dominant_colors(cropped)
-            dominant_colors.append(colors)
+        if results:
+            for result in results[0].boxes:
+                x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
+                cropped = image[y1:y2, x1:x2]
+                colors = retrieve_dominant_colors(cropped)
+                dominant_colors.append(colors)
         
         self.result.emit(dominant_colors)
         self.annotated.emit(annotated)
@@ -621,6 +623,15 @@ class App(QWidget):
         if not image_path or image_path is None:
             self.alert = QMessageBox()
             self.alert.setText("Please provide a valid input image")
+            self.alert.exec()
+            return
+
+        img_test = Image.open(image_path)
+        img_arr = np.array(img_test)
+
+        if len(img_arr.shape) != 3:
+            self.alert = QMessageBox()
+            self.alert.setText("Input image is invalid or corrupted")
             self.alert.exec()
             return
 
